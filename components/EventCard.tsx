@@ -19,15 +19,22 @@ function formatMoney(amount: number) {
 
 function formatDate(dateStr: string) {
   if (!dateStr) return 'Próximamente';
-  // Parse YYYY-MM-DD manually to avoid timezone issues
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
   
-  const day = parts[2];
+  // Handle ISO strings (remove time) and YYYY-MM-DD
+  const cleanDate = dateStr.split('T')[0]; 
+  const parts = cleanDate.split('-');
+  
+  if (parts.length !== 3) return cleanDate;
+  
+  const year = parseInt(parts[0]);
   const monthIndex = parseInt(parts[1]) - 1;
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const day = parseInt(parts[2]);
   
-  return `${day} ${months[monthIndex] || ''}`;
+  // Create date in local time to preserve day/month exactly as input
+  const date = new Date(year, monthIndex, day);
+  
+  // Use Intl.DateTimeFormat as requested
+  return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' }).format(date);
 }
 
 export default function EventCard({ event, relatedEvents, onReserveClick, priority = false }: EventCardProps) {
@@ -54,6 +61,9 @@ export default function EventCard({ event, relatedEvents, onReserveClick, priori
       <div className="p-6 flex-1 flex flex-col bg-[#111111]">
         <div className="flex justify-between items-start mb-3">
           <span className="bg-blue-900 text-blue-200 text-xs font-bold px-2.5 py-1 rounded uppercase tracking-wide">{event.category}</span>
+          <span className="bg-gray-800 text-gray-300 text-xs font-bold px-2.5 py-1 rounded border border-gray-700 uppercase tracking-wide">
+            {formatDate(event.date)}
+          </span>
         </div>
         <h2 className="text-2xl font-bold mb-2 text-white tracking-tight">{event.title}</h2>
         <p className="text-gray-400 mb-6 line-clamp-2 text-sm font-medium">{event.description}</p>
