@@ -18,6 +18,16 @@ export type Event = {
   comercio_id?: string;
   duration?: string;
   reservation_fee?: number;
+  is_active?: boolean;
+  detalles_extra?: any;
+  comercios?: { nombre: string; slug: string }; // Joined relation
+}
+
+export type Category = {
+  id: string;
+  nombre: string;
+  icono?: string;
+  activo: boolean;
 }
 
 export type Commerce = {
@@ -27,6 +37,9 @@ export type Commerce = {
   owner_id: string;
   logo_url?: string;
   es_destacado: boolean;
+  activo?: boolean; // New field
   created_at: string;
   payment_data?: any;
+  categoria_id?: string;
+  categorias?: Category; // Joined relation
 }

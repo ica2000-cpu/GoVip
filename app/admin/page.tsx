@@ -1,4 +1,4 @@
-import { getAdminData, checkAuth, getAllCommerces, getCurrentCommerceId } from './actions';
+import { getAdminData, checkAuth, getAllCommerces, getCurrentCommerceId, getCategories } from './actions';
 import AdminDashboard from '@/components/AdminDashboard';
 import AdminLogin from '@/components/AdminLogin';
 import { redirect } from 'next/navigation';
@@ -27,13 +27,19 @@ export default async function AdminPage() {
     );
   }
 
-  // Check if Super Admin to fetch all commerces
+  // Check if Super Admin to fetch all commerces and categories
   let allCommerces = null;
+  let allCategories = null;
   
   if (data.isSuperAdmin) {
       const commercesResult = await getAllCommerces();
       if (commercesResult?.success) {
           allCommerces = commercesResult.commerces;
+      }
+      
+      const categoriesResult = await getCategories();
+      if (categoriesResult?.success) {
+          allCategories = categoriesResult.categories;
       }
   }
 
@@ -45,7 +51,9 @@ export default async function AdminPage() {
       initialPaymentSettings={data.paymentSettings}
       commerceName={data.commerceName}
       commerceLogo={data.commerceLogo}
+      commerceSlug={data.commerceSlug}
       initialCommerces={allCommerces}
+      initialCategories={allCategories}
       isSuperAdmin={data.isSuperAdmin}
     />
   );

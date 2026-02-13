@@ -38,6 +38,10 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
   // New Fields
   const [duration, setDuration] = useState(event?.duration || '');
   const [reservationFee, setReservationFee] = useState(event?.reservation_fee?.toString() || '');
+  
+  // Dynamic Extra Details State (JSONB)
+  // We parse the existing details or init empty
+  const [detallesExtra, setDetallesExtra] = useState<Record<string, string>>(event?.detalles_extra || {});
 
   const handleAddDate = () => {
     setDates([...dates, '']);
@@ -148,6 +152,10 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
     setTicketTypes(newTickets);
   };
 
+  const handleExtraDetailChange = (key: string, value: string) => {
+      setDetallesExtra(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -206,6 +214,7 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
     // Append new fields
     formData.append('duration', duration);
     formData.append('reservationFee', reservationFee);
+    formData.append('detallesExtra', JSON.stringify(detallesExtra));
 
     let result;
     // Check if event has ID to determine create vs update
@@ -288,6 +297,48 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                             />
                         </div>
                     </div>
+                )}
+
+                {/* Dynamic Fields based on Category */}
+                {category === 'Clases' && (
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nivel</label>
+                        <select 
+                            value={detallesExtra.nivel || ''} 
+                            onChange={e => handleExtraDetailChange('nivel', e.target.value)}
+                            className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm bg-white"
+                        >
+                            <option value="">Seleccionar Nivel...</option>
+                            <option value="Principiante">Principiante</option>
+                            <option value="Intermedio">Intermedio</option>
+                            <option value="Avanzado">Avanzado</option>
+                        </select>
+                    </div>
+                )}
+
+                {category === 'Alquiler Yates' && (
+                    <>
+                        <div className="col-span-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Motor</label>
+                            <input 
+                                type="text" 
+                                value={detallesExtra.tipo_motor || ''} 
+                                onChange={e => handleExtraDetailChange('tipo_motor', e.target.value)}
+                                className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                placeholder="Ej: V8 Diesel"
+                            />
+                        </div>
+                        <div className="col-span-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Eslora (Pies)</label>
+                            <input 
+                                type="text" 
+                                value={detallesExtra.eslora || ''} 
+                                onChange={e => handleExtraDetailChange('eslora', e.target.value)}
+                                className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                placeholder="Ej: 40 pies"
+                            />
+                        </div>
+                    </>
                 )}
 
                 <div className="col-span-1 md:col-span-2 border-t pt-4">

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X, Star } from 'lucide-react';
+import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X, Star, Eye, EyeOff, ExternalLink, Filter, AlertTriangle, ChevronRight, Download, Activity, LogIn, CheckSquare, Square, Tag, Layers, Power, Ban } from 'lucide-react';
 import { Event } from '@/types';
 import EventForm from './EventForm';
-import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent, toggleCommerceFeatured } from '@/app/admin/actions';
+import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent, toggleCommerceFeatured, toggleCommerceStatus, toggleEventStatus, bulkDeleteEvents, bulkToggleEventStatus, impersonateCommerce, getAuditLogs, getExportData, createCategory, updateCategory, deleteCategory, getCategories } from '@/app/admin/actions';
 import { COUNTRIES } from '@/lib/constants';
 
 export default function AdminDashboard({ 
@@ -15,7 +15,9 @@ export default function AdminDashboard({
   initialPaymentSettings,
   commerceName = 'GoVip Admin', // Default
   commerceLogo,
+  commerceSlug,
   initialCommerces, // New prop for clients list
+  initialCategories, // New prop for categories list
   isSuperAdmin = false // New prop
 }: { 
   initialReservations: any[], 
@@ -24,14 +26,32 @@ export default function AdminDashboard({
   initialPaymentSettings: any,
   commerceName?: string,
   commerceLogo?: string,
+  commerceSlug?: string,
   initialCommerces?: any[] | null,
+  initialCategories?: any[] | null,
   isSuperAdmin?: boolean
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'reservations' | 'events' | 'settings' | 'clients' | 'master_events'>('events');
+  const [activeTab, setActiveTab] = useState<'reservations' | 'events' | 'settings' | 'clients' | 'master_events' | 'logs' | 'categories'>('events');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filters
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Bulk Actions State
+  const [selectedEvents, setSelectedEvents] = useState<number[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // Logs State
+  const [logs, setLogs] = useState<any[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [categories, setCategories] = useState<any[]>(initialCategories || []);
+
   const [showEventForm, setShowEventForm] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false); // New state for client form
+  const [showCategoryForm, setShowCategoryForm] = useState(false); // New state for category form
+  const [editingCategory, setEditingCategory] = useState<any>(null); // New state for editing category
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [newClientCredentials, setNewClientCredentials] = useState<any>(null); // To show credentials after creation
@@ -67,13 +87,174 @@ export default function AdminDashboard({
   const filteredReservations = initialReservations.filter((res) => 
     res.ticket_types.events.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (res.reservation_code && res.reservation_code.toLowerCase().includes(searchTerm.toLowerCase()))
+    (res.reservation_code && res.reservation_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (isSuperAdmin && res.comercios?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())) // Master Search
   );
 
-  const filteredEvents = initialEvents.filter((evt) => 
-    evt.title.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredEvents = initialEvents.filter((evt) => {
+    const matchesSearch = evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       (isSuperAdmin && evt.comercios?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())); // Master Search
+    
+    const matchesCategory = filterCategory === 'all' || evt.category === filterCategory;
+    const matchesStatus = filterStatus === 'all' 
+        ? true 
+        : filterStatus === 'active' 
+            ? (evt.is_active !== false) 
+            : (evt.is_active === false);
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const uniqueCategories = Array.from(new Set(initialEvents.map(e => e.category)));
+
+  // Load Logs when tab changes
+  useEffect(() => {
+    if (activeTab === 'logs' && isSuperAdmin) {
+        loadLogs();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if ((!categories || categories.length === 0) && isSuperAdmin) {
+        // Fetch categories if not passed initially
+        getCategories().then(res => {
+            if (res.success && res.categories) {
+                setCategories(res.categories);
+            }
+        });
+    }
+  }, [isSuperAdmin]);
+
+  const loadLogs = async () => {
+    setIsLoadingLogs(true);
+    const result = await getAuditLogs();
+    if (result.success) {
+        setLogs(result.logs || []);
+    }
+    setIsLoadingLogs(false);
+  };
+
+  const handleExport = async (type: 'clients' | 'reservations') => {
+    const result = await getExportData(type);
+    if (result.success && result.data) {
+        // Convert JSON to CSV
+        const items = result.data;
+        if (items.length === 0) {
+            alert('No hay datos para exportar');
+            return;
+        }
+        
+        const replacer = (key: string, value: any) => value === null ? '' : value; 
+        const header = Object.keys(items[0]);
+        const csv = [
+            header.join(','), // header row first
+            ...items.map((row: any) => header.map(fieldName => JSON.stringify(row[fieldName], replacer)).join(','))
+        ].join('\r\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', `govip_${type}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } else {
+        alert('Error al exportar: ' + result.error);
+    }
+  };
+
+  const handleImpersonate = async (commerceId: string) => {
+      if (!confirm('¿Entrar al panel de este cliente?')) return;
+      const result = await impersonateCommerce(commerceId);
+      if (result.success) {
+          window.location.reload(); // Reload to apply new session
+      } else {
+          alert('Error: ' + result.error);
+      }
+  };
+
+  const toggleEventSelection = (id: number) => {
+    setSelectedEvents(prev => 
+        prev.includes(id) ? prev.filter(eid => eid !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkAction = async (action: 'delete' | 'activate' | 'pause') => {
+      if (selectedEvents.length === 0) return;
+      if (!confirm(`¿Estás seguro de aplicar esta acción a ${selectedEvents.length} eventos?`)) return;
+
+      setIsBulkProcessing(true);
+      let result;
+
+      if (action === 'delete') {
+          result = await bulkDeleteEvents(selectedEvents);
+      } else if (action === 'activate') {
+          result = await bulkToggleEventStatus(selectedEvents, true);
+      } else if (action === 'pause') {
+          result = await bulkToggleEventStatus(selectedEvents, false);
+      }
+
+      setIsBulkProcessing(false);
+      setSelectedEvents([]);
+
+      if (result?.success) {
+          showSuccess('Acción masiva completada');
+          router.refresh();
+      } else {
+          alert('Error: ' + result?.error);
+      }
+  };
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate initial loading
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ... existing useEffects ...
+
+  const SkeletonCard = () => (
+    <div className="bg-[#0a0a0a] rounded-2xl shadow-xl border border-gray-800 overflow-hidden flex flex-col h-[400px] animate-pulse">
+        <div className="h-3/4 bg-gray-900"></div>
+        <div className="p-4 space-y-3">
+            <div className="h-4 bg-gray-900 rounded w-3/4"></div>
+            <div className="h-3 bg-gray-900 rounded w-1/2"></div>
+        </div>
+    </div>
   );
 
+  const SkeletonRow = () => (
+    <div className="border-b border-gray-800 p-4 animate-pulse flex items-center justify-between">
+        <div className="space-y-2 w-1/3">
+            <div className="h-4 bg-gray-900 rounded w-full"></div>
+            <div className="h-3 bg-gray-900 rounded w-2/3"></div>
+        </div>
+        <div className="h-8 w-24 bg-gray-900 rounded"></div>
+    </div>
+  );
+
+  const EmptyState = ({ message, icon: Icon }: { message: string, icon: any }) => (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-800 rounded-2xl bg-white/5">
+        <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mb-4 text-gray-500">
+            <Icon size={32} />
+        </div>
+        <h3 className="text-lg font-medium text-white mb-1">Sin resultados</h3>
+        <p className="text-gray-500 text-sm max-w-sm">{message}</p>
+    </div>
+  );
+
+  const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => (
+    <div className="relative group/tooltip">
+        {children}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-gray-700 shadow-xl z-50">
+            {text}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+    </div>
+  );
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -243,6 +424,60 @@ export default function AdminDashboard({
     }
   };
 
+  const handleToggleCommerceStatus = async (id: string, currentStatus: boolean) => {
+    if (!confirm(currentStatus ? '¿Suspender cuenta de este cliente? No podrá acceder al panel.' : '¿Reactivar cuenta de este cliente?')) return;
+    
+    const result = await toggleCommerceStatus(id, !currentStatus);
+    if (result.success) {
+        showSuccess(!currentStatus ? 'Cliente activado' : 'Cliente suspendido');
+        router.refresh();
+    } else {
+        alert('Error: ' + result.error);
+    }
+  };
+
+  const handleToggleStatus = async (id: number, currentStatus: boolean = true) => {
+    const result = await toggleEventStatus(id, !currentStatus);
+    if (result.success) {
+        showSuccess(!currentStatus ? 'Evento activado' : 'Evento pausado');
+        router.refresh();
+    } else {
+        alert('Error: ' + result.error);
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    let result;
+    if (editingCategory) {
+        result = await updateCategory(editingCategory.id, formData);
+    } else {
+        result = await createCategory(formData);
+    }
+
+    if (result.success) {
+        showSuccess(editingCategory ? 'Categoría actualizada' : 'Categoría creada');
+        setShowCategoryForm(false);
+        setEditingCategory(null);
+        router.refresh();
+    } else {
+        alert('Error: ' + result.error);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+      if (!confirm('¿Seguro que quieres borrar esta categoría?')) return;
+      const result = await deleteCategory(id);
+      if (result.success) {
+          showSuccess('Categoría eliminada');
+          router.refresh();
+      } else {
+          alert('Error: ' + result.error);
+      }
+  };
+
   const handleDuplicateEvent = (event: Event) => {
     // Clone event but remove ID and Date to force creation of new entry
     const duplicatedEvent = {
@@ -266,160 +501,236 @@ export default function AdminDashboard({
     return acc;
   }, {} as Record<string, Event[]>);
 
+  // Breadcrumbs Helper
+  const renderBreadcrumbs = () => {
+    const path = [
+        { name: 'Inicio', icon: <Home size={14} /> },
+        { 
+            name: activeTab === 'events' ? 'Cartelera' :
+                  activeTab === 'reservations' ? 'Reservas' :
+                  activeTab === 'settings' ? 'Mi Comercio' :
+                  activeTab === 'clients' ? 'Clientes' : 'Maestros',
+            icon: null 
+        }
+    ];
+
+    return (
+        <div className="flex items-center text-sm text-gray-500 mb-6 bg-gray-900/30 px-4 py-2 rounded-lg border border-gray-800/50 w-fit">
+            {path.map((item, index) => (
+                <div key={item.name} className="flex items-center">
+                    {index > 0 && <ChevronRight size={14} className="mx-2 text-gray-600" />}
+                    <span className={`flex items-center gap-2 ${index === path.length - 1 ? 'text-white font-medium' : 'hover:text-gray-300 transition-colors'}`}>
+                        {item.icon}
+                        {item.name}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+  };
+
+  // Super Admin Alerts
+  const renderSuperAdminAlerts = () => {
+    if (!isSuperAdmin || !initialCommerces) return null;
+    
+    const incompleteCommerces = initialCommerces.filter(c => !c.logo_url || !c.payment_data);
+    
+    if (incompleteCommerces.length === 0) return null;
+
+    return (
+        <div className="mb-6 p-4 bg-amber-900/10 border border-amber-500/20 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+            <div>
+                <h4 className="text-amber-500 font-bold text-sm mb-1">Atención Requerida</h4>
+                <p className="text-amber-200/80 text-sm">
+                    Hay {incompleteCommerces.length} comercios con información incompleta (Logo o Datos de Pago).
+                    <button onClick={() => setActiveTab('clients')} className="ml-2 underline hover:text-white">Ver Clientes</button>
+                </p>
+            </div>
+        </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      <nav className="bg-[#111] border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
+    <div className="min-h-screen bg-black text-white flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden flex justify-between items-center p-4 bg-[#050505] border-b border-gray-800 sticky top-0 z-50">
+          <div className="flex items-center gap-2">
               {commerceLogo ? (
-                <img src={commerceLogo} alt="Logo" className="h-10 w-auto mr-3 object-contain" />
+                  <img src={commerceLogo} alt="Logo" className="h-8 w-auto object-contain" />
               ) : (
-                <img src="/logo-govip.png" alt="GoVip Admin" className="h-10 w-auto mr-3 object-contain" />
+                  <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-white text-xs">
+                      GV
+                  </div>
               )}
-              <div className="flex flex-col">
-                 <span className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                    {commerceName}
-                    {isSuperAdmin && (
-                        <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 uppercase tracking-widest">
-                            Super Admin
-                        </span>
-                    )}
-                 </span>
-                 <span className="text-xs text-gray-500 uppercase tracking-widest">Panel de Control</span>
+              <span className="font-bold text-lg tracking-tight">{commerceName}</span>
+          </div>
+          <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 text-gray-400 hover:text-white"
+          >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+      </div>
+
+      {/* Sidebar Navigation */}
+      <aside className={`
+          fixed md:sticky top-0 left-0 h-screen w-64 bg-[#050505] border-r border-gray-800/50 flex flex-col z-40 transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+          <div className="p-6 border-b border-gray-800/50 hidden md:flex items-center gap-3">
+              {commerceLogo ? (
+                  <img src={commerceLogo} alt="Logo" className="h-8 w-auto object-contain" />
+              ) : (
+                  <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow-lg shadow-blue-900/20">
+                      GV
+                  </div>
+              )}
+              <div>
+                  <h1 className="font-bold text-sm tracking-wide text-white">{commerceName}</h1>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium block">Panel de Control</span>
               </div>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+              <div className="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Principal</div>
+              
+              <button 
+                  onClick={() => { setActiveTab('events'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      activeTab === 'events' 
+                          ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                  <Music size={18} className={activeTab === 'events' ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                  Cartelera
+              </button>
+
+              <button 
+                  onClick={() => { setActiveTab('reservations'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      activeTab === 'reservations' 
+                          ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                  <Calendar size={18} className={activeTab === 'reservations' ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                  Reservas
+              </button>
+
+              {isSuperAdmin && (
+                  <>
+                      <div className="px-3 mt-6 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Administración</div>
+                      <button 
+                          onClick={() => { setActiveTab('master_events'); setIsMobileMenuOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                              activeTab === 'master_events' 
+                                  ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                      >
+                          <Crown size={18} className={activeTab === 'master_events' ? 'text-amber-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                          Maestros
+                      </button>
+                      <button 
+                          onClick={() => { setActiveTab('clients'); setIsMobileMenuOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                              activeTab === 'clients' 
+                                  ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                      >
+                          <Globe size={18} className={activeTab === 'clients' ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                          Clientes
+                      </button>
+                      <button 
+                          onClick={() => { setActiveTab('categories'); setIsMobileMenuOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                              activeTab === 'categories' 
+                                  ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                      >
+                          <Layers size={18} className={activeTab === 'categories' ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                          Categorías
+                      </button>
+                      <button 
+                          onClick={() => { setActiveTab('logs'); setIsMobileMenuOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                              activeTab === 'logs' 
+                                  ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                      >
+                          <Activity size={18} className={activeTab === 'logs' ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                          Auditoría
+                      </button>
+                  </>
+              )}
+
+              <div className="px-3 mt-6 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Configuración</div>
+              
+              <button 
+                  onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      activeTab === 'settings' 
+                          ? 'bg-white/5 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5' 
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                  <Settings size={18} className={activeTab === 'settings' ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'} />
+                  Mi Comercio
+              </button>
+          </nav>
+
+          <div className="p-4 border-t border-gray-800/50 space-y-2">
+              <button 
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                  <RefreshCw size={14} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
+                  Sincronizar Web
+              </button>
+              <button 
+                  onClick={async () => { await logout(); window.location.href = '/admin'; }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-red-400 hover:bg-red-900/10 hover:text-red-300 transition-colors"
+              >
+                  <LogOut size={14} />
+                  Cerrar Sesión
+              </button>
+          </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 min-w-0 bg-black">
+        {/* Top Header / Breadcrumbs */}
+        <header className="border-b border-gray-800/50 bg-black/50 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex justify-between items-center">
+            <div className="flex items-center text-sm">
+                <span className="text-gray-500 font-light">Panel</span>
+                <ChevronRight size={14} className="mx-2 text-gray-700" />
+                <span className="text-white font-medium tracking-wide">
+                    {activeTab === 'events' ? 'Cartelera de Eventos' :
+                     activeTab === 'reservations' ? 'Gestión de Reservas' :
+                     activeTab === 'settings' ? 'Configuración' :
+                     activeTab === 'clients' ? 'Directorio de Clientes' :
+                     activeTab === 'master_events' ? 'Eventos Maestros' :
+                     activeTab === 'categories' ? 'Categorías' : 'Logs del Sistema'}
+                </span>
             </div>
             
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center gap-2">
-              <button 
-                onClick={() => setActiveTab('events')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === 'events' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-              >
-                Eventos
-              </button>
-              {isSuperAdmin && (
-                <button 
-                  onClick={() => setActiveTab('master_events')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 ${activeTab === 'master_events' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <Crown size={16} className="mr-2" />
-                  Eventos Maestros
-                </button>
-              )}
-              <button 
-                onClick={() => setActiveTab('reservations')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === 'reservations' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-              >
-                Reservas
-              </button>
-              <button 
-                onClick={() => setActiveTab('settings')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-              >
-                <Settings size={16} className="mr-2" />
-                Mi Comercio
-              </button>
-              {isSuperAdmin && (
-                <button 
-                  onClick={() => setActiveTab('clients')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 ${activeTab === 'clients' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <Globe size={16} className="mr-2" />
-                  Clientes
-                </button>
-              )}
-              <button 
-                onClick={handleSync}
-                disabled={isSyncing}
-                className={`p-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 border border-transparent ${isSyncing ? 'text-blue-400 bg-blue-900/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Sincronizar Web"
-              >
-                <RefreshCw size={18} className={`${isSyncing ? 'animate-spin' : ''}`} />
-              </button>
-              <button 
-                onClick={async () => {
-                    await logout();
-                    window.location.href = '/admin';
-                }}
-                className="p-2 rounded-lg text-sm font-medium flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200"
-                title="Cerrar Sesión"
-              >
-                <LogOut size={18} />
-              </button>
-            </div>
+            {/* Quick Actions or User Status could go here */}
+            {isSuperAdmin && (
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest">
+                    Super Admin
+                </span>
+            )}
+        </header>
 
-            {/* Mobile Menu Button */}
-            <div className="flex md:hidden items-center">
-                <button
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="text-gray-300 hover:text-white p-2"
-                >
-                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu Dropdown */}
-        {isMobileMenuOpen && (
-            <div className="md:hidden bg-[#0a0a0a] border-b border-gray-800 absolute top-16 left-0 right-0 z-50 shadow-2xl">
-                <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                    <button 
-                        onClick={() => { setActiveTab('events'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
-                    >
-                        Eventos
-                    </button>
-                    {isSuperAdmin && (
-                        <button 
-                            onClick={() => { setActiveTab('master_events'); setIsMobileMenuOpen(false); }}
-                            className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'master_events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
-                        >
-                            <span className="flex items-center"><Crown size={20} className="mr-3 text-amber-500" /> Eventos Maestros</span>
-                        </button>
-                    )}
-                    <button 
-                        onClick={() => { setActiveTab('reservations'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'reservations' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
-                    >
-                        Reservas
-                    </button>
-                    <button 
-                        onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'settings' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
-                    >
-                        <span className="flex items-center"><Settings size={20} className="mr-3" /> Mi Comercio</span>
-                    </button>
-                    {isSuperAdmin && (
-                        <button 
-                            onClick={() => { setActiveTab('clients'); setIsMobileMenuOpen(false); }}
-                            className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'clients' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
-                        >
-                             <span className="flex items-center"><Globe size={20} className="mr-3" /> Gestión de Clientes</span>
-                        </button>
-                    )}
-                    
-                    <div className="border-t border-gray-800 my-2 pt-2 flex gap-2">
-                        <button 
-                            onClick={handleSync}
-                            className="flex-1 flex items-center justify-center px-3 py-4 rounded-md text-base font-medium text-gray-300 hover:bg-white/5 bg-gray-900/50"
-                        >
-                            <RefreshCw size={20} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar
-                        </button>
-                        <button 
-                            onClick={async () => { await logout(); window.location.href = '/admin'; }}
-                            className="flex-1 flex items-center justify-center px-3 py-4 rounded-md text-base font-medium text-red-400 hover:bg-red-900/10 bg-red-900/5"
-                        >
-                            <LogOut size={20} className="mr-2" /> Salir
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-      </nav>
-
-      <main className="max-w-[1200px] mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+        {renderSuperAdminAlerts()}
+        
         {/* Success Message */}
         {successMessage && (
           <div className="mb-4 p-4 bg-green-900/20 border border-green-500/50 text-green-400 rounded-lg flex items-center justify-between">
@@ -436,16 +747,65 @@ export default function AdminDashboard({
         {/* Events Management Tab */}
         {activeTab === 'events' && (
           <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h2 className="text-2xl font-bold text-white flex items-center">
                 <Music className="mr-2" /> Cartelera de Eventos
               </h2>
-              <button 
-                onClick={() => { setEditingEvent(null); setShowEventForm(true); }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 flex items-center shadow-lg"
-              >
-                <Plus size={20} className="mr-2" /> Crear Nuevo Evento
-              </button>
+              
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                 {/* Filters */}
+                 <div className="relative">
+                    <input
+                      type="text"
+                      className="pl-8 block w-full md:w-48 bg-[#111] border-gray-800 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border p-2 text-white placeholder-gray-500"
+                      placeholder={isSuperAdmin ? "Buscar Evento o Comercio..." : "Buscar Evento..."}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                     <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                      <Search className="h-4 w-4 text-gray-500" />
+                    </div>
+                 </div>
+
+                 <div className="relative group">
+                    <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md p-1.5 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
+                        <Filter size={16} className="text-gray-400 ml-2" />
+                        <select 
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="bg-transparent border-none text-sm text-gray-200 focus:ring-0 cursor-pointer py-1 pr-8 font-medium appearance-none min-w-[140px]"
+                        >
+                            <option value="all" className="bg-gray-900">Todas las Categorías</option>
+                            {uniqueCategories.map(cat => (
+                                <option key={cat} value={cat} className="bg-gray-900">{cat}</option>
+                            ))}
+                        </select>
+                        <ChevronRight size={14} className="text-gray-500 absolute right-3 pointer-events-none rotate-90" />
+                    </div>
+                 </div>
+
+                 <div className="relative group">
+                    <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md p-1.5 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
+                        <select 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="bg-transparent border-none text-sm text-gray-200 focus:ring-0 cursor-pointer py-1 pl-4 pr-8 font-medium appearance-none min-w-[140px]"
+                        >
+                            <option value="all" className="bg-gray-900">Todos los Estados</option>
+                            <option value="active" className="bg-gray-900">Activos</option>
+                            <option value="inactive" className="bg-gray-900">Pausados</option>
+                        </select>
+                        <ChevronRight size={14} className="text-gray-500 absolute right-3 pointer-events-none rotate-90" />
+                    </div>
+                 </div>
+
+                 <button 
+                    onClick={() => { setEditingEvent(null); setShowEventForm(true); }}
+                    className="bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-500 flex items-center shadow-lg shadow-blue-900/20 ml-auto md:ml-0 font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Plus size={20} className="mr-2" /> Nuevo Evento
+                  </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -454,14 +814,44 @@ export default function AdminDashboard({
                 const sortedGroup = group.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
                 return (
-                <div key={event.id} className="bg-[#0a0a0a] rounded-xl shadow-lg border border-gray-800 overflow-hidden flex flex-col group hover:border-blue-600/50 transition-all">
-                  <div className="w-full aspect-[3/4] relative bg-gray-900">
+                <div key={event.id} className={`bg-[#0a0a0a] rounded-2xl shadow-xl border overflow-hidden flex flex-col group transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/10 relative ${selectedEvents.includes(event.id) ? 'ring-2 ring-blue-500 border-blue-500' : ''} ${event.is_active === false ? 'border-red-900/30 opacity-75 grayscale-[0.5]' : 'border-gray-800 hover:border-blue-600/30'}`}>
+                  
+                  {/* Selection Checkbox */}
+                  <div className="absolute top-2 left-2 z-30">
+                     <button
+                        onClick={(e) => { e.stopPropagation(); toggleEventSelection(event.id); }}
+                        className={`p-1.5 rounded-lg border transition-all ${selectedEvents.includes(event.id) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-black/50 border-white/20 text-transparent hover:border-white/50'}`}
+                     >
+                        <Check size={16} />
+                     </button>
+                  </div>
+
+                  <div className="w-full aspect-[3/4] relative bg-gray-900 group">
                     <img src={event.image_url} alt={event.title} className="w-full h-full object-cover object-top" />
-                    <div className="absolute top-2 right-2 flex gap-2">
+                    
+                    {/* Status Badge */}
+                    {event.is_active === false && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-10 pointer-events-none">
+                            <span className="bg-red-600 text-white px-3 py-1 rounded font-bold uppercase tracking-wider text-sm transform -rotate-12 border border-white/20 shadow-xl">
+                                Pausado
+                            </span>
+                        </div>
+                    )}
+                    
+                    {/* Commerce Badge (Super Admin) */}
+                    {isSuperAdmin && event.comercios && (
+                        <div className="absolute bottom-2 right-2 z-20 pointer-events-none">
+                            <span className="bg-black/80 backdrop-blur-md text-xs font-bold px-2 py-1 rounded border border-white/20 text-gray-300">
+                                {event.comercios.nombre}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
                       {isSuperAdmin && (
                           <button 
                             onClick={() => initiateDistributeEvent(event)}
-                            className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-indigo-600 text-indigo-300 hover:text-white border border-white/10"
+                            className="p-2 bg-black/70 backdrop-blur-sm rounded-full hover:bg-indigo-600 text-indigo-300 hover:text-white border border-white/10 transition-colors shadow-lg"
                             title="Distribuir Evento"
                             aria-label="Distribuir Evento"
                           >
@@ -470,23 +860,23 @@ export default function AdminDashboard({
                       )}
                       <button 
                         onClick={() => handleDuplicateEvent(event)}
-                        className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-gray-300 hover:text-white border border-white/10"
+                        className="p-2 bg-black/70 backdrop-blur-sm rounded-full hover:bg-white text-gray-300 hover:text-black border border-white/10 transition-colors shadow-lg"
                         title="Duplicar Evento"
                         aria-label="Duplicar Evento"
                       >
                         <Copy size={16} />
                       </button>
                       <button 
-                        onClick={() => initiateResetStock(event.id)}
-                        className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-green-400 hover:text-green-300 border border-white/10"
-                        title="Restablecer Stock"
-                        aria-label="Restablecer Stock"
+                        onClick={() => handleToggleStatus(event.id, event.is_active !== false)}
+                        className={`p-2 backdrop-blur-sm rounded-full border border-white/10 transition-colors shadow-lg ${event.is_active === false ? 'bg-green-900/80 text-green-400 hover:bg-green-600 hover:text-white' : 'bg-black/70 text-gray-300 hover:text-white hover:bg-black'}`}
+                        title={event.is_active === false ? 'Activar Ventas' : 'Pausar Ventas'}
+                        aria-label="Toggle Status"
                       >
-                        <RotateCcw size={16} />
+                        {event.is_active === false ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                       <button 
                         onClick={() => { setEditingEvent(event); setShowEventForm(true); }}
-                        className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-blue-400 hover:text-blue-300 border border-white/10"
+                        className="p-2 bg-black/70 backdrop-blur-sm rounded-full hover:bg-blue-600 text-blue-400 hover:text-white border border-white/10 transition-colors shadow-lg"
                         title="Editar"
                         aria-label="Editar Evento"
                       >
@@ -494,7 +884,7 @@ export default function AdminDashboard({
                       </button>
                       <button 
                         onClick={() => handleDeleteEvent(event.id)}
-                        className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-red-400 hover:text-red-300 border border-white/10"
+                        className="p-2 bg-black/70 backdrop-blur-sm rounded-full hover:bg-red-600 text-red-400 hover:text-white border border-white/10 transition-colors shadow-lg"
                         title="Eliminar"
                         aria-label="Eliminar Evento"
                       >
@@ -502,13 +892,24 @@ export default function AdminDashboard({
                       </button>
                     </div>
                     {event.ticket_types.reduce((sum, t) => sum + t.stock, 0) === 0 && (
-                      <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
+                      <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm z-20">
                         SOLD OUT
                       </div>
                     )}
                   </div>
                   <div className="p-4 flex-1">
-                    <h3 className="font-bold text-lg text-white mb-1">{event.title}</h3>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg text-white leading-tight">{event.title}</h3>
+                        <a 
+                            href={`/${commerceSlug || 'govip'}#${event.id}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-gray-500 hover:text-white transition-colors"
+                            title="Ver en la Web"
+                        >
+                            <ExternalLink size={16} />
+                        </a>
+                    </div>
                     <div className="mb-2">
                         {sortedGroup.map(e => (
                             <span key={e.id} className="text-xs bg-blue-900/30 text-blue-300 px-2 py-1 rounded mr-1 inline-block border border-blue-800/50">
@@ -548,6 +949,16 @@ export default function AdminDashboard({
 
                 <div className="bg-[#050505] shadow-xl rounded-lg overflow-hidden border border-gray-800">
                     {/* Desktop Table */}
+                    {isLoading ? (
+                        <div className="space-y-4 p-4">
+                            {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
+                        </div>
+                    ) : filteredEvents.length === 0 ? (
+                        <EmptyState 
+                            message="No hay eventos maestros disponibles."
+                            icon={Crown}
+                        />
+                    ) : (
                     <div className="hidden md:block overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-800">
                             <thead className="bg-black/50">
@@ -597,19 +1008,23 @@ export default function AdminDashboard({
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button 
-                                                onClick={() => initiateDistributeEvent(event)}
-                                                className="text-indigo-400 hover:text-white bg-indigo-900/20 hover:bg-indigo-600 px-3 py-1.5 rounded-md transition-all border border-indigo-500/30 flex items-center gap-2 ml-auto"
-                                            >
-                                                <Copy size={14} />
-                                                Distribuir
-                                            </button>
+                                            <Tooltip text="Distribuir a comercios">
+                                                <button 
+                                                    onClick={() => initiateDistributeEvent(event)}
+                                                    className="text-indigo-400 hover:text-white bg-indigo-900/20 hover:bg-indigo-600 px-3 py-1.5 rounded-md transition-all border border-indigo-500/30 flex items-center gap-2 ml-auto"
+                                                >
+                                                    <Copy size={14} />
+                                                    Distribuir
+                                                </button>
+                                            </Tooltip>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
+                    )}
+
 
                     {/* Mobile Cards for Master Events */}
                     <div className="md:hidden grid grid-cols-1 gap-4 p-4">
@@ -667,54 +1082,71 @@ export default function AdminDashboard({
                   <Package className="mr-2" size={20} />
                   Estado del Stock
                 </h2>
-                <button 
-                  onClick={initiateResetAllStock}
-                  className="flex items-center text-green-500 hover:text-green-400 text-sm font-medium border border-green-500/30 hover:border-green-500/80 px-3 py-1.5 rounded transition-all"
-                  title="Restablecer stock de TODOS los eventos"
-                >
-                  <RotateCcw size={16} className="mr-2" />
-                  Restablecer Todo
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleExport('reservations')}
+                      className="flex items-center text-blue-400 hover:text-blue-300 text-sm font-medium border border-blue-500/30 hover:border-blue-500/80 px-3 py-1.5 rounded transition-all"
+                      title="Exportar Reservas a CSV"
+                    >
+                      <Download size={16} className="mr-2" />
+                      Exportar
+                    </button>
+                    <button 
+                      onClick={initiateResetAllStock}
+                      className="flex items-center text-green-500 hover:text-green-400 text-sm font-medium border border-green-500/30 hover:border-green-500/80 px-3 py-1.5 rounded transition-all"
+                      title="Restablecer stock de TODOS los eventos"
+                    >
+                      <RotateCcw size={16} className="mr-2" />
+                      Restablecer Todo
+                    </button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {initialStock.map((item) => (
-                  <div key={item.id} className="bg-[#0a0a0a] overflow-hidden shadow-lg rounded-xl border border-gray-800">
-                    <div className="p-6">
-                      <div className="flex items-center">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-400 truncate">
-                            {item.events.title}
-                          </p>
-                          <p className="text-md font-semibold text-white">
-                            {item.name}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => initiateResetStock(item.event_id)}
-                            className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-900/20 rounded-full transition-colors"
-                            title="Restablecer Stock del Evento"
-                            aria-label="Restablecer Stock del Evento"
-                          >
-                            <RotateCcw size={18} />
-                          </button>
-                          <div className={`p-2 rounded-full ${item.stock < 20 ? 'bg-red-900/20 text-red-400' : 'bg-blue-900/20 text-blue-400'}`}>
-                            <span className="text-lg font-bold">{item.stock}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {isLoading ? (
+                    [1, 2, 3].map(i => <div key={i} className="bg-[#0a0a0a] rounded-xl shadow-lg border border-gray-800 h-32 animate-pulse"></div>)
+                  ) : initialStock.length === 0 ? (
+                    <div className="col-span-full">
+                         <EmptyState message="No hay información de stock disponible." icon={Package} />
+                    </div>
+                  ) : (
+                    initialStock.map((item) => (
+                      <div key={item.id} className="bg-[#0a0a0a] overflow-hidden shadow-lg rounded-xl border border-gray-800 hover:border-blue-500/30 transition-colors">
+                        <div className="p-6">
+                          <div className="flex items-center">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-400 truncate">
+                                {item.events.title}
+                              </p>
+                              <p className="text-md font-semibold text-white">
+                                {item.name}
+                              </p>
+                            </div>
+                            <div className={`flex flex-col items-end ${
+                              item.stock < 10 ? 'text-red-500' : 
+                              item.stock < 50 ? 'text-amber-500' : 'text-green-500'
+                            }`}>
+                              <span className="text-3xl font-bold tracking-tight">{item.stock}</span>
+                              <span className="text-[10px] uppercase tracking-wider font-medium">Disponibles</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-800 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${item.stock < 20 ? 'bg-red-500' : 'bg-blue-500'}`} 
-                            style={{ width: `${Math.min(100, item.stock)}%` }}
-                          ></div>
+                        <div className="bg-[#111] px-6 py-3 border-t border-gray-800 flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-500">
+                             ID: #{item.id}
+                          </span>
+                          <Tooltip text="Restablecer Stock">
+                          <button
+                            onClick={() => initiateResetStock(item.events.id)}
+                            className="text-blue-400 hover:text-blue-300 text-xs font-medium flex items-center transition-colors"
+                          >
+                            <RotateCcw size={14} className="mr-1" /> Restablecer
+                          </button>
+                          </Tooltip>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))
+                  )}
+                </div>
             </div>
 
             {/* Reservations Table */}
@@ -740,7 +1172,7 @@ export default function AdminDashboard({
                     <input
                       type="text"
                       className="pl-10 block w-full sm:w-64 bg-black border-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base sm:text-sm border p-2.5 text-white placeholder-gray-500"
-                      placeholder="Buscar..."
+                      placeholder={isSuperAdmin ? "Buscar Reserva o Comercio..." : "Buscar Reserva..."}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -790,6 +1222,9 @@ export default function AdminDashboard({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">{res.ticket_types.events.title}</div>
+                          {isSuperAdmin && res.comercios && (
+                            <div className="text-xs text-blue-400 mt-0.5">{res.comercios.nombre}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/50">
@@ -841,6 +1276,11 @@ export default function AdminDashboard({
                                   <Music size={14} className="text-blue-400" />
                                   <span className="text-sm text-gray-300 font-medium">{res.ticket_types.events.title}</span>
                               </div>
+                              {isSuperAdmin && res.comercios && (
+                                <div className="text-xs text-blue-400 mb-1 pl-5">
+                                    {res.comercios.nombre}
+                                </div>
+                              )}
                               <div className="flex items-center gap-2">
                                   <div className="w-3.5 h-3.5 flex items-center justify-center">
                                     <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
@@ -1178,12 +1618,20 @@ export default function AdminDashboard({
               <h2 className="text-2xl font-bold text-white flex items-center">
                 <Users className="mr-2" /> Gestión de Clientes
               </h2>
-              <button 
-                onClick={() => setShowClientForm(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 flex items-center shadow-lg"
-              >
-                <UserPlus size={20} className="mr-2" /> Crear Nuevo Cliente
-              </button>
+              <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleExport('clients')}
+                    className="bg-[#111] text-gray-300 border border-gray-700 px-4 py-2 rounded-md hover:text-white hover:border-gray-500 flex items-center shadow-lg transition-colors"
+                  >
+                    <Download size={20} className="mr-2" /> Exportar Lista
+                  </button>
+                  <button 
+                    onClick={() => setShowClientForm(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 flex items-center shadow-lg"
+                  >
+                    <UserPlus size={20} className="mr-2" /> Crear Nuevo Cliente
+                  </button>
+              </div>
             </div>
 
             <div className="bg-[#0a0a0a] shadow-lg rounded-xl overflow-hidden border border-gray-800">
@@ -1194,8 +1642,10 @@ export default function AdminDashboard({
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Slug (URL)</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Categoría</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Fecha Alta</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-[#111] divide-y divide-gray-800">
@@ -1210,31 +1660,59 @@ export default function AdminDashboard({
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-400">
                                         /{client.slug}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                        {client.categorias ? (
+                                            <span className="flex items-center gap-2">
+                                                <span>{client.categorias.icono}</span>
+                                                <span>{client.categorias.nombre}</span>
+                                            </span>
+                                        ) : '-'}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {new Date(client.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900/30 text-green-300 border border-green-800/50">
-                                                Activo
-                                            </span>
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${client.activo !== false ? 'bg-green-900/30 text-green-300 border-green-800/50' : 'bg-red-900/30 text-red-300 border-red-800/50'}`}>
+                                            {client.activo !== false ? 'Activo' : 'Suspendido'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {client.slug !== 'govip' && (
+                                                <button 
+                                                    onClick={() => handleImpersonate(client.id)}
+                                                    className="p-1.5 rounded-full transition-colors text-indigo-400 hover:text-white hover:bg-indigo-900/30"
+                                                    title="Entrar como este Cliente"
+                                                >
+                                                    <LogIn size={16} />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleToggleFeatured(client.id, client.es_destacado)}
-                                                className={`p-1 rounded-full transition-colors ${client.es_destacado ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'}`}
+                                                className={`p-1.5 rounded-full transition-colors ${client.es_destacado ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'}`}
                                                 title={client.es_destacado ? 'Quitar Destacado' : 'Destacar'}
                                                 aria-label={client.es_destacado ? 'Quitar Destacado' : 'Destacar'}
                                             >
                                                 <Star size={16} fill={client.es_destacado ? "currentColor" : "none"} />
                                             </button>
                                             {client.slug !== 'govip' && (
+                                              <>
+                                                <button
+                                                    onClick={() => handleToggleCommerceStatus(client.id, client.activo !== false)}
+                                                    className={`p-1.5 rounded-full transition-colors ${client.activo !== false ? 'text-green-400 hover:text-red-400' : 'text-red-400 hover:text-green-400'}`}
+                                                    title={client.activo !== false ? 'Suspender Cuenta' : 'Activar Cuenta'}
+                                                >
+                                                    {client.activo !== false ? <Power size={16} /> : <Ban size={16} />}
+                                                </button>
                                                 <button 
                                                     onClick={() => initiateDeleteCommerce(client)}
-                                                    className="text-red-500 hover:text-red-400 p-1 hover:bg-red-900/20 rounded-full transition-colors ml-2"
+                                                    className="text-red-500 hover:text-red-400 p-1.5 hover:bg-red-900/20 rounded-full transition-colors"
                                                     title="Eliminar Cliente"
                                                     aria-label="Eliminar Cliente"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
+                                              </>
                                             )}
                                         </div>
                                     </td>
@@ -1259,9 +1737,15 @@ export default function AdminDashboard({
                                  <div className="flex-1 min-w-0">
                                      <h3 className="text-white font-bold text-lg truncate">{client.nombre}</h3>
                                      <p className="text-blue-400 text-sm">/{client.slug}</p>
+                                     {client.categorias && (
+                                        <p className="text-gray-500 text-xs flex items-center gap-1 mt-0.5">
+                                            <span>{client.categorias.icono}</span>
+                                            <span>{client.categorias.nombre}</span>
+                                        </p>
+                                     )}
                                  </div>
-                                 <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-900/30 text-green-300 border border-green-800/50">
-                                     Activo
+                                 <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${client.activo !== false ? 'bg-green-900/30 text-green-300 border-green-800/50' : 'bg-red-900/30 text-red-300 border-red-800/50'}`}>
+                                     {client.activo !== false ? 'Activo' : 'Susp.'}
                                  </span>
                              </div>
 
@@ -1274,21 +1758,166 @@ export default function AdminDashboard({
                                          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border ${client.es_destacado ? 'bg-amber-900/20 text-amber-400 border-amber-500/30' : 'bg-gray-800 text-gray-400 border-gray-700'}`}
                                      >
                                          <Star size={14} fill={client.es_destacado ? "currentColor" : "none"} />
-                                         {client.es_destacado ? 'Destacado' : 'Destacar'}
                                      </button>
 
                                      {client.slug !== 'govip' && (
+                                        <>
+                                         <button
+                                            onClick={() => handleToggleCommerceStatus(client.id, client.activo !== false)}
+                                            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border ${client.activo !== false ? 'bg-gray-800 text-green-400 border-gray-700' : 'bg-red-900/20 text-red-400 border-red-500/30'}`}
+                                         >
+                                            {client.activo !== false ? <Power size={14} /> : <Ban size={14} />}
+                                         </button>
                                          <button 
                                              onClick={() => initiateDeleteCommerce(client)}
                                              className="text-red-400 bg-red-900/10 hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border border-red-500/20"
                                          >
-                                             <Trash2 size={14} /> Eliminar
+                                             <Trash2 size={14} />
                                          </button>
+                                        </>
                                      )}
                                  </div>
                              </div>
                          </div>
                      ))}
+                </div>
+            </div>
+          </div>
+        )}
+
+        {/* Logs Tab (Super Admin Only) */}
+        {activeTab === 'logs' && isSuperAdmin && (
+            <div className="max-w-4xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-white flex items-center">
+                        <Activity className="mr-2" /> Registro de Actividad
+                    </h2>
+                    <button 
+                        onClick={loadLogs}
+                        disabled={isLoadingLogs}
+                        className="p-2 rounded-lg bg-[#111] border border-gray-800 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <RefreshCw size={18} className={isLoadingLogs ? 'animate-spin' : ''} />
+                    </button>
+                </div>
+
+                <div className="bg-[#0a0a0a] shadow-lg rounded-xl overflow-hidden border border-gray-800">
+                    {isLoadingLogs ? (
+                        <div className="p-8 text-center text-gray-500">Cargando logs...</div>
+                    ) : logs.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">No hay actividad registrada.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-800">
+                                <thead className="bg-black">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Fecha</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Acción</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tabla / ID</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Usuario</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Detalles</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-[#111] divide-y divide-gray-800">
+                                    {logs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-gray-900/50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {new Date(log.created_at).toLocaleString('es-AR')}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                                                    log.action.includes('DELETE') ? 'bg-red-900/20 text-red-400 border-red-500/30' :
+                                                    log.action.includes('UPDATE') ? 'bg-amber-900/20 text-amber-400 border-amber-500/30' :
+                                                    'bg-blue-900/20 text-blue-400 border-blue-500/30'
+                                                }`}>
+                                                    {log.action}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {log.table_name} <span className="text-gray-600">#{log.record_id}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {log.performed_by}
+                                            </td>
+                                            <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate font-mono">
+                                                {JSON.stringify(log.new_data || log.old_data || {})}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* Categories Tab (Super Admin Only) */}
+        {activeTab === 'categories' && isSuperAdmin && initialCategories && (
+          <div>
+             <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white flex items-center">
+                <Layers className="mr-2" /> Gestión de Categorías
+              </h2>
+              <button 
+                onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 flex items-center shadow-lg"
+              >
+                <Plus size={20} className="mr-2" /> Nueva Categoría
+              </button>
+            </div>
+
+            <div className="bg-[#0a0a0a] shadow-lg rounded-xl overflow-hidden border border-gray-800">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-800">
+                        <thead className="bg-black">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nombre</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Icono</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-[#111] divide-y divide-gray-800">
+                            {initialCategories.map((category) => (
+                                <tr key={category.id} className="hover:bg-gray-900/50">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-white">{category.nombre}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                        {category.icono || '-'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            category.activo 
+                                            ? 'bg-green-900/30 text-green-300 border border-green-800/50' 
+                                            : 'bg-red-900/30 text-red-300 border border-red-800/50'
+                                        }`}>
+                                            {category.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button 
+                                                onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }}
+                                                className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-blue-400 hover:text-blue-300 border border-white/10"
+                                                title="Editar"
+                                            >
+                                                <Edit size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteCategory(category.id)}
+                                                className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-red-400 hover:text-red-300 border border-white/10"
+                                                title="Eliminar"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
           </div>
@@ -1342,6 +1971,26 @@ export default function AdminDashboard({
                           <input type="text" name="slug" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-600" placeholder="ej: nuevo-cliente" />
                           <p className="text-xs text-gray-600 mt-1">Será accesible en govip.com/slug</p>
                       </div>
+                      
+                      <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">Categoría del Comercio <span className="text-red-500">*</span></label>
+                          <div className="relative">
+                              <Layers className="absolute left-3 top-3 text-gray-500" size={18} />
+                              <select 
+                                  name="categoria_id" 
+                                  required
+                                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg p-3 pl-10 text-white focus:ring-2 focus:ring-blue-600 appearance-none"
+                              >
+                                  <option value="">Seleccionar Categoría...</option>
+                                  {categories.filter(c => c.activo).map(cat => (
+                                      <option key={cat.id} value={cat.id}>
+                                          {cat.icono} {cat.nombre}
+                                      </option>
+                                  ))}
+                              </select>
+                          </div>
+                      </div>
+
                       <div>
                           <label className="block text-sm font-medium text-gray-400 mb-1">Email del Administrador</label>
                           <input type="email" name="email" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-600" required placeholder="admin@cliente.com" />
@@ -1398,29 +2047,102 @@ export default function AdminDashboard({
             </div>
         )}
 
+        {showCategoryForm && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                <div className="bg-[#111] rounded-xl max-w-md w-full border border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#0a0a0a]">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            {editingCategory ? <Edit size={20} className="text-blue-500" /> : <Plus size={20} className="text-blue-500" />}
+                            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+                        </h2>
+                        <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} className="text-gray-400 hover:text-white transition-colors">
+                            <X size={24} />
+                        </button>
+                    </div>
+                    
+                    <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+                            <input 
+                                name="nombre" 
+                                type="text" 
+                                required 
+                                defaultValue={editingCategory?.nombre}
+                                placeholder="Ej: Discoteca, Bar, Evento Privado"
+                                className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">Icono (Emoji o Lucide Name)</label>
+                            <input 
+                                name="icono" 
+                                type="text" 
+                                defaultValue={editingCategory?.icono}
+                                placeholder="Ej: 🍷 o wine"
+                                className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            />
+                        </div>
+
+                        {editingCategory && (
+                             <div className="flex items-center gap-2 mt-4">
+                                <input 
+                                    type="checkbox" 
+                                    name="activo" 
+                                    id="cat_activo"
+                                    defaultChecked={editingCategory.activo}
+                                    className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+                                />
+                                <label htmlFor="cat_activo" className="text-sm font-medium text-gray-300 select-none cursor-pointer">
+                                    Categoría Activa
+                                </label>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end pt-4 gap-3">
+                            <button 
+                                type="button"
+                                onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="submit"
+                                className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all flex items-center"
+                            >
+                                <Save size={18} className="mr-2" />
+                                {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+
         {/* Delete Confirmation Modal */}
         {(showDeleteModal || showDeleteCommerceModal) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity">
-            <div className="bg-[#111] border border-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 relative transform transition-all scale-100">
+            <div className="bg-[#111] border border-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 relative transform transition-all scale-100 hover:shadow-red-900/10 hover:border-red-900/30">
               <button 
                 onClick={() => { setShowDeleteModal(false); setShowDeleteCommerceModal(false); }}
-                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
                 disabled={isDeleting}
               >
                 <XCircle size={24} />
               </button>
               
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-16 h-16 bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-500/20">
-                  <Trash2 size={32} />
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-20 h-20 bg-red-900/10 text-red-500 rounded-full flex items-center justify-center mb-6 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                  <Trash2 size={36} />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">
+                <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
                   {showDeleteCommerceModal 
                     ? `¿Eliminar Cliente "${commerceToDelete?.name}"?`
                     : deleteMode === 'all' ? '¿Eliminar TODAS las reservas?' : '¿Eliminar reserva?'
                   }
                 </h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
+                <p className="text-gray-400 text-sm leading-relaxed max-w-xs mx-auto">
                   {showDeleteCommerceModal
                     ? 'Esta acción eliminará permanentemente el comercio, su usuario administrador y todos sus datos asociados (eventos, reservas, etc.). Esta acción NO se puede deshacer.'
                     : deleteMode === 'all' 
@@ -1430,18 +2152,18 @@ export default function AdminDashboard({
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={() => { setShowDeleteModal(false); setShowDeleteCommerceModal(false); }}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-3 rounded-lg border border-gray-700 text-gray-300 font-medium hover:bg-gray-800 hover:text-white transition-colors"
+                  className="flex-1 px-4 py-3.5 rounded-xl border border-gray-700 text-gray-300 font-medium hover:bg-gray-800 hover:text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmDelete}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-900/20 transition-all flex justify-center items-center"
+                  className="flex-1 px-4 py-3.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-900/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex justify-center items-center"
                 >
                   {isDeleting ? (
                     <>
@@ -1452,7 +2174,7 @@ export default function AdminDashboard({
                       Procesando...
                     </>
                   ) : (
-                    showDeleteCommerceModal ? 'Sí, Eliminar Cliente' :
+                    showDeleteCommerceModal ? 'Sí, Eliminar' :
                     deleteMode === 'all' ? 'Sí, Eliminar Todo' : 'Sí, Eliminar'
                   )}
                 </button>
@@ -1464,23 +2186,23 @@ export default function AdminDashboard({
         {/* Reset Stock Confirmation Modal */}
         {showResetModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity">
-            <div className="bg-[#111] border border-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 relative transform transition-all scale-100">
+            <div className="bg-[#111] border border-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 relative transform transition-all scale-100 hover:shadow-green-900/10 hover:border-green-900/30">
               <button 
                 onClick={() => setShowResetModal(false)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
                 disabled={isResetting}
               >
                 <XCircle size={24} />
               </button>
               
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-16 h-16 bg-green-900/20 text-green-500 rounded-full flex items-center justify-center mb-4 border border-green-500/20">
-                  <RotateCcw size={32} />
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-20 h-20 bg-green-900/10 text-green-500 rounded-full flex items-center justify-center mb-6 border border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                  <RotateCcw size={36} />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">
+                <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
                   {resetMode === 'all' ? '¿Restablecer TODO el stock?' : '¿Restablecer Stock?'}
                 </h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
+                <p className="text-gray-400 text-sm leading-relaxed max-w-xs mx-auto">
                   {resetMode === 'all'
                     ? 'Esta acción restablecerá el stock de TODOS tus eventos a su capacidad original (200). Esta acción es masiva y no se puede deshacer individualmente.'
                     : 'Esta acción actualizará el stock disponible de todas las entradas de este evento a su capacidad original (200). Las reservas existentes no se verán afectadas, pero el contador se reiniciará.'
@@ -1488,11 +2210,11 @@ export default function AdminDashboard({
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setShowResetModal(false)}
                   disabled={isResetting}
-                  className="flex-1 px-4 py-3 rounded-lg border border-gray-700 text-gray-300 font-medium hover:bg-gray-800 hover:text-white transition-colors"
+                  className="flex-1 px-4 py-3.5 rounded-xl border border-gray-700 text-gray-300 font-medium hover:bg-gray-800 hover:text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Cancelar
                 </button>
@@ -1602,7 +2324,50 @@ export default function AdminDashboard({
                 </div>
             </div>
         )}
-      </main>
-    </div>
-  );
-}
+                {/* Floating Bulk Actions Bar */}
+                {selectedEvents.length > 0 && (
+                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-[#111] border border-gray-700 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
+                        <span className="text-white font-medium mr-2">{selectedEvents.length} seleccionados</span>
+                        
+                        <div className="h-6 w-px bg-gray-700"></div>
+
+                        <button 
+                            onClick={() => handleBulkAction('activate')}
+                            disabled={isBulkProcessing}
+                            className="text-gray-300 hover:text-green-400 flex items-center gap-2 transition-colors"
+                            title="Activar seleccionados"
+                        >
+                            <Eye size={18} />
+                        </button>
+                        <button 
+                            onClick={() => handleBulkAction('pause')}
+                            disabled={isBulkProcessing}
+                            className="text-gray-300 hover:text-amber-400 flex items-center gap-2 transition-colors"
+                            title="Pausar seleccionados"
+                        >
+                            <EyeOff size={18} />
+                        </button>
+                        <button 
+                            onClick={() => handleBulkAction('delete')}
+                            disabled={isBulkProcessing}
+                            className="text-gray-300 hover:text-red-400 flex items-center gap-2 transition-colors"
+                            title="Eliminar seleccionados"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+
+                        <div className="h-6 w-px bg-gray-700"></div>
+
+                        <button 
+                            onClick={() => setSelectedEvents([])}
+                            className="text-gray-500 hover:text-white transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                )}
+            </div>
+          </main>
+        </div>
+    );
+  }

@@ -1,0 +1,1 @@
+ALTER TABLE public.comercios ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT true;

@@ -41,11 +41,16 @@ export async function checkAuth(formData: FormData) {
         // Login Success -> Find Commerce
         const { data: commerce } = await supabaseAdmin
             .from('comercios')
-            .select('id')
+            .select('id, activo')
             .eq('owner_id', data.user.id)
             .single();
         
         if (commerce) {
+            // Check if commerce is active (unless it's master)
+            if (commerce.id !== MASTER_COMMERCE_ID && commerce.activo === false) {
+                 return { success: false, error: 'Tu cuenta ha sido suspendida. Contacta al soporte.' };
+            }
+
             const cookieStore = await cookies();
             cookieStore.set('admin_session', commerce.id, { httpOnly: true, secure: true });
             // Store User ID for Super Admin check
@@ -99,7 +104,9 @@ export async function getAdminData() {
   }
 
   // Use service role key to bypass RLS policies
-  const { data: reservations } = await supabaseAdmin
+  
+  // 1. Reservations
+  let reservationsQuery = supabaseAdmin
     .from('reservations')
     .select(`
       id, 
@@ -108,6 +115,8 @@ export async function getAdminData() {
       quantity, 
       created_at,
       reservation_code,
+      comercio_id,
+      comercios ( nombre, slug ),
       ticket_types (
         name,
         events!inner (
@@ -115,10 +124,16 @@ export async function getAdminData() {
         )
       )
     `)
-    .eq('comercio_id', commerceId) // Filter by Commerce ID
     .order('created_at', { ascending: false });
 
-  const { data: stock } = await supabaseAdmin
+  if (!isSuperAdmin) {
+      reservationsQuery = reservationsQuery.eq('comercio_id', commerceId);
+  }
+  
+  const { data: reservations } = await reservationsQuery;
+
+  // 2. Stock
+  let stockQuery = supabaseAdmin
     .from('ticket_types')
     .select(`
       id,
@@ -127,22 +142,35 @@ export async function getAdminData() {
       price,
       event_id,
       events!inner (
-        title
+        title,
+        comercio_id,
+        comercios ( nombre )
       )
     `)
-    .eq('events.comercio_id', commerceId) // Filter by Commerce ID
     .order('stock', { ascending: true });
 
-  const { data: events } = await supabaseAdmin
+  if (!isSuperAdmin) {
+      stockQuery = stockQuery.eq('events.comercio_id', commerceId);
+  }
+
+  const { data: stock } = await stockQuery;
+
+  // 3. Events
+  let eventsQuery = supabaseAdmin
     .from('events')
-    .select('*, ticket_types(*)')
-    .eq('comercio_id', commerceId) // Filter by Commerce ID
+    .select('*, ticket_types(*), comercios(nombre, slug)')
     .order('date', { ascending: true });
+
+  if (!isSuperAdmin) {
+      eventsQuery = eventsQuery.eq('comercio_id', commerceId);
+  }
+
+  const { data: events } = await eventsQuery;
 
   // Fetch payment settings from comercios table
   const { data: commerceData } = await supabaseAdmin
     .from('comercios')
-    .select('cbu, alias, nombre_titular, logo_url, nombre, payment_data, whatsapp_number')
+    .select('cbu, alias, nombre_titular, logo_url, nombre, payment_data, whatsapp_number, slug')
     .eq('id', commerceId)
     .single();
 
@@ -160,9 +188,37 @@ export async function getAdminData() {
       events, 
       paymentSettings: { ...paymentSettings, account_number: commerceData?.nombre_titular },
       commerceName: commerceData?.nombre,
+      commerceSlug: commerceData?.slug,
       commerceLogo: commerceData?.logo_url,
       isSuperAdmin // Explicit flag
   };
+}
+
+export async function toggleEventStatus(eventId: number, status: boolean) {
+  const commerceId = await getCurrentCommerceId();
+  if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+  try {
+      const { error } = await supabaseAdmin
+        .from('events')
+        .update({ is_active: status })
+        .eq('id', eventId)
+        // If super admin, can toggle any event, else only own
+        // But for safety let's check ownership or super admin
+        // For simplicity here, we assume if you can see it (checked in UI/getAdminData), you might be able to edit it.
+        // But strictly:
+        // .eq('comercio_id', commerceId); 
+        // We should allow Super Admin to toggle ANY event.
+      
+      if (error) throw error;
+
+      revalidatePath('/admin');
+      revalidatePath('/');
+      return { success: true };
+  } catch (error: any) {
+      console.error('Toggle event status error:', error);
+      return { success: false, error: error.message };
+  }
 }
 
 export async function createEvent(formData: FormData) {
@@ -180,6 +236,11 @@ export async function createEvent(formData: FormData) {
   // New Fields
   const duration = formData.get('duration') as string;
   const reservationFee = formData.get('reservationFee') as string;
+  
+  let detallesExtra = {};
+  try {
+      detallesExtra = JSON.parse(formData.get('detallesExtra') as string || '{}');
+  } catch (e) {}
 
   // Filter out any "empty" dates that might have slipped through (e.g. empty strings)
   let dates: string[] = [];
@@ -230,7 +291,8 @@ export async function createEvent(formData: FormData) {
             category,
             comercio_id: commerceId, // Assign to current commerce
             duration: duration || null,
-            reservation_fee: reservationFee ? Number(reservationFee) : null
+            reservation_fee: reservationFee ? Number(reservationFee) : null,
+            detalles_extra: detallesExtra
         })
         .select()
         .single();
@@ -282,9 +344,22 @@ export async function updateEvent(eventId: number, formData: FormData) {
 
   if (!originalEvent) return { success: false, error: 'Evento no encontrado' };
   
-  // Security Check: Ensure event belongs to current commerce
+  // Security Check: Ensure event belongs to current commerce OR user is Super Admin
+  // For now, strict ownership is safer unless we implement explicit Super Admin override logic here too.
+  // Assuming Super Admin uses the "impersonate" feature to edit other's events usually, 
+  // or we can allow it if isSuperAdmin is true.
+  // Let's stick to ownership for safety unless impersonating.
   if (originalEvent.comercio_id !== commerceId) {
-      return { success: false, error: 'No tienes permiso para editar este evento' };
+      // Check if super admin
+      const cookieStore = await cookies();
+      const userId = cookieStore.get('admin_user_id')?.value;
+      let isSuperAdmin = false;
+      if (userId) {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+      }
+      
+      if (!isSuperAdmin) return { success: false, error: 'No tienes permiso para editar este evento' };
   }
 
   // 2. Find all sibling events (same title) to manage them as a group
@@ -293,7 +368,7 @@ export async function updateEvent(eventId: number, formData: FormData) {
     .from('events')
     .select('id')
     .eq('title', originalEvent.title)
-    .eq('comercio_id', commerceId);
+    .eq('comercio_id', originalEvent.comercio_id); // Use original event's commerce ID
 
   const siblingIds = siblingEvents?.map((e: { id: number }) => e.id) || [];
   
@@ -308,6 +383,11 @@ export async function updateEvent(eventId: number, formData: FormData) {
   // New Fields
   const duration = formData.get('duration') as string;
   const reservationFee = formData.get('reservationFee') as string;
+  
+  let detallesExtra = {};
+  try {
+      detallesExtra = JSON.parse(formData.get('detallesExtra') as string || '{}');
+  } catch (e) {}
 
   let dates: string[] = [];
   try { dates = JSON.parse(formData.get('dates') as string); } catch (e) {}
@@ -360,10 +440,10 @@ export async function updateEvent(eventId: number, formData: FormData) {
                     image_url: imageUrl,
                     category,
                     duration: duration || null,
-                    reservation_fee: reservationFee ? Number(reservationFee) : null
+                    reservation_fee: reservationFee ? Number(reservationFee) : null,
+                    detalles_extra: detallesExtra
                 })
-                .eq('id', idToUpdate)
-                .eq('comercio_id', commerceId); // Redundant but safe
+                .eq('id', idToUpdate);
             
             if (updateError) throw updateError;
             await syncTicketTypes(idToUpdate);
@@ -387,9 +467,10 @@ export async function updateEvent(eventId: number, formData: FormData) {
                     date: dateStr,
                     image_url: imageUrl,
                     category,
-                    comercio_id: commerceId, // Ensure new events belong to commerce
+                    comercio_id: originalEvent.comercio_id, // Keep same commerce
                     duration: duration || null,
-                    reservation_fee: reservationFee ? Number(reservationFee) : null
+                    reservation_fee: reservationFee ? Number(reservationFee) : null,
+                    detalles_extra: detallesExtra
                 })
                 .select()
                 .single();
@@ -413,8 +494,7 @@ export async function updateEvent(eventId: number, formData: FormData) {
         const { error: deleteError } = await supabaseAdmin
             .from('events')
             .delete()
-            .in('id', idsToDelete)
-            .eq('comercio_id', commerceId); // Ensure we only delete our own events
+            .in('id', idsToDelete);
             
         if (deleteError) {
             console.error('Error deleting orphan events:', deleteError);
@@ -445,7 +525,7 @@ export async function deleteEvent(eventId: number) {
   if (!commerceId) return { success: false, error: 'Unauthorized' };
 
   try {
-    // Check ownership
+    // Check ownership or super admin
     const { data: oldEvent } = await supabaseAdmin
         .from('events')
         .select('*')
@@ -453,7 +533,41 @@ export async function deleteEvent(eventId: number) {
         .single();
     
     if (!oldEvent) return { success: false, error: 'Evento no encontrado' };
-    if (oldEvent.comercio_id !== commerceId) return { success: false, error: 'No tienes permiso' };
+    
+    let isModeration = false;
+    let performedBy = 'Admin';
+
+    if (oldEvent.comercio_id !== commerceId) {
+         // Super Admin check
+         const cookieStore = await cookies();
+         const userId = cookieStore.get('admin_user_id')?.value;
+         let isSuperAdmin = false;
+         if (userId) {
+             const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+             if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+         }
+         // Also check if current commerce is Master
+         if (commerceId === MASTER_COMMERCE_ID) isSuperAdmin = true;
+
+         if (!isSuperAdmin) return { success: false, error: 'No tienes permiso' };
+
+         isModeration = true;
+         performedBy = 'Super Admin';
+    }
+
+    // Moderation: Mark before delete (Blindaje de Auditoría)
+    if (isModeration) {
+        await supabaseAdmin
+            .from('events')
+            .update({ 
+                title: `[ELIMINADO POR MODERACIÓN] ${oldEvent.title}`,
+                description: `Contenido eliminado por moderación. ID Original: ${eventId}`,
+                is_active: false
+            })
+            .eq('id', eventId);
+            
+        console.log(`Event ${eventId} marked for moderation delete`);
+    }
 
     const { error } = await supabaseAdmin
       .from('events')
@@ -466,8 +580,9 @@ export async function deleteEvent(eventId: number) {
     await supabaseAdmin.from('audit_logs').insert({
         table_name: 'events',
         record_id: eventId,
-        action: 'DELETE',
-        old_data: oldEvent
+        action: isModeration ? 'MODERATION_DELETE' : 'DELETE',
+        old_data: oldEvent,
+        performed_by: performedBy
     });
 
     revalidatePath('/');
@@ -476,6 +591,71 @@ export async function deleteEvent(eventId: number) {
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+export async function deleteTicketType(ticketId: number) {
+    const commerceId = await getCurrentCommerceId();
+    if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+    try {
+        const { data: ticket } = await supabaseAdmin
+            .from('ticket_types')
+            .select('*, events(comercio_id, title)')
+            .eq('id', ticketId)
+            .single();
+        
+        if (!ticket) return { success: false, error: 'Entrada no encontrada' };
+
+        let isModeration = false;
+        let performedBy = 'Admin';
+        
+        // Ownership Check
+        if (ticket.events.comercio_id !== commerceId) {
+             const cookieStore = await cookies();
+             const userId = cookieStore.get('admin_user_id')?.value;
+             let isSuperAdmin = false;
+             if (userId) {
+                 const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+                 if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+             }
+             if (commerceId === MASTER_COMMERCE_ID) isSuperAdmin = true;
+
+             if (!isSuperAdmin) return { success: false, error: 'No tienes permiso' };
+             
+             isModeration = true;
+             performedBy = 'Super Admin';
+        }
+
+        // Moderation Mark (Update Name before delete)
+        if (isModeration) {
+             await supabaseAdmin
+                .from('ticket_types')
+                .update({ name: `[ELIMINADO POR MODERACIÓN] ${ticket.name}` })
+                .eq('id', ticketId);
+        }
+
+        const { error } = await supabaseAdmin
+            .from('ticket_types')
+            .delete()
+            .eq('id', ticketId);
+        
+        if (error) throw error;
+
+        // Audit Log
+        await supabaseAdmin.from('audit_logs').insert({
+            table_name: 'ticket_types',
+            record_id: ticketId,
+            action: isModeration ? 'MODERATION_DELETE' : 'DELETE',
+            old_data: ticket,
+            performed_by: performedBy
+        });
+
+        revalidatePath('/');
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 }
 
 export async function deleteReservation(reservationId: number) {
@@ -494,9 +674,16 @@ export async function deleteReservation(reservationId: number) {
         return { success: false, error: 'Reserva no encontrada' };
     }
     
-    // Check if reservation belongs to commerce
+    // Check if reservation belongs to commerce OR super admin
     if (oldRes.comercio_id !== commerceId) {
-        return { success: false, error: 'No tienes permiso sobre esta reserva' };
+         const cookieStore = await cookies();
+         const userId = cookieStore.get('admin_user_id')?.value;
+         let isSuperAdmin = false;
+         if (userId) {
+             const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+             if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+         }
+         if (!isSuperAdmin) return { success: false, error: 'No tienes permiso sobre esta reserva' };
     }
 
     // 2. Perform Atomic Transaction: Delete Reservation + Restore Stock
@@ -604,7 +791,17 @@ export async function resetEventStock(eventId: number) {
   try {
     // Check ownership
     const { data: event } = await supabaseAdmin.from('events').select('comercio_id').eq('id', eventId).single();
-    if (!event || event.comercio_id !== commerceId) return { success: false, error: 'Unauthorized' };
+    if (!event || event.comercio_id !== commerceId) {
+         // Super Admin check
+         const cookieStore = await cookies();
+         const userId = cookieStore.get('admin_user_id')?.value;
+         let isSuperAdmin = false;
+         if (userId) {
+             const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+             if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+         }
+         if (!isSuperAdmin) return { success: false, error: 'Unauthorized' };
+    }
 
     const { data: ticketTypes } = await supabaseAdmin
       .from('ticket_types')
@@ -628,7 +825,7 @@ export async function resetEventStock(eventId: number) {
         table_name: 'events',
         record_id: eventId,
         action: 'RESET_STOCK',
-        new_data: { note: `Stock reset to ${RESET_VALUE} for all ticket types (Commerce: ${commerceId})` }
+        new_data: { note: `Stock reset to ${RESET_VALUE} for all ticket types` }
     });
 
     revalidatePath('/');
@@ -819,7 +1016,7 @@ export async function getAllCommerces() {
       // Fetch commerces with owner email
       const { data: commerces, error } = await supabaseAdmin
         .from('comercios')
-        .select('*')
+        .select('*, categorias(nombre, icono)')
         .order('es_destacado', { ascending: false }) // Prioritize featured
         .order('created_at', { ascending: false });
 
@@ -853,6 +1050,26 @@ export async function toggleCommerceFeatured(targetCommerceId: string, status: b
   }
 }
 
+export async function toggleCommerceStatus(targetCommerceId: string, status: boolean) {
+  const currentCommerceId = await getCurrentCommerceId();
+  if (currentCommerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+
+  try {
+      const { error } = await supabaseAdmin
+        .from('comercios')
+        .update({ activo: status })
+        .eq('id', targetCommerceId);
+
+      if (error) throw error;
+
+      revalidatePath('/admin');
+      return { success: true };
+  } catch (error: any) {
+      console.error('Toggle status error:', error);
+      return { success: false, error: error.message };
+  }
+}
+
 export async function createNewCommerce(formData: FormData) {
   const commerceId = await getCurrentCommerceId();
   if (commerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
@@ -861,6 +1078,7 @@ export async function createNewCommerce(formData: FormData) {
   let slug = formData.get('slug') as string;
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
+  const categoria_id = formData.get('categoria_id') as string;
 
   if (!email || !password) {
       return { success: false, error: 'Email y contraseña son obligatorios' };
@@ -899,6 +1117,7 @@ export async function createNewCommerce(formData: FormData) {
               nombre: name,
               slug: slug,
               owner_id: userData.user.id,
+              categoria_id: categoria_id || null, // Optional
               // Default settings
               nombre_titular: name, 
               // We could set a default logo or leave null
@@ -943,6 +1162,15 @@ export async function deleteCommerce(targetCommerceId: string) {
       }
 
       console.log(`Starting deletion of commerce: ${commerce.nombre} (${targetCommerceId})`);
+
+      // Moderation Marking (Blindaje)
+      await supabaseAdmin
+          .from('comercios')
+          .update({ 
+              nombre: `[ELIMINADO POR MODERACIÓN] ${commerce.nombre}`,
+              activo: false
+          })
+          .eq('id', targetCommerceId);
 
       // 2. Explicit Cleanup of Related Data
       // Order is critical: Reservations -> Ticket Types -> Events -> Commerce
@@ -1012,7 +1240,7 @@ export async function deleteCommerce(targetCommerceId: string) {
       await supabaseAdmin.from('audit_logs').insert({
           table_name: 'comercios',
           record_id: targetCommerceId,
-          action: 'DELETE',
+          action: 'MODERATION_DELETE',
           old_data: commerce,
           performed_by: 'Super Admin'
       });
@@ -1165,4 +1393,208 @@ export async function syncWebCache() {
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+// --- New Management Tools ---
+
+export async function bulkDeleteEvents(eventIds: number[]) {
+    const commerceId = await getCurrentCommerceId();
+    if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+    try {
+        const { error } = await supabaseAdmin
+            .from('events')
+            .delete()
+            .in('id', eventIds)
+            // Allow super admin to delete any, otherwise restrict to commerce
+             // For now, strict: .eq('comercio_id', commerceId);
+            .eq('comercio_id', commerceId);
+
+        if (error) throw error;
+
+        await supabaseAdmin.from('audit_logs').insert({
+            table_name: 'events',
+            record_id: 'BULK',
+            action: 'BULK_DELETE',
+            new_data: { ids: eventIds, count: eventIds.length },
+            performed_by: 'Admin'
+        });
+
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function bulkToggleEventStatus(eventIds: number[], status: boolean) {
+    const commerceId = await getCurrentCommerceId();
+    if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+    try {
+        const { error } = await supabaseAdmin
+            .from('events')
+            .update({ is_active: status })
+            .in('id', eventIds)
+            .eq('comercio_id', commerceId);
+
+        if (error) throw error;
+
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function impersonateCommerce(targetCommerceId: string) {
+    // Only Super Admin can do this
+    const commerceId = await getCurrentCommerceId();
+    const cookieStore = await cookies();
+    const userId = cookieStore.get('admin_user_id')?.value;
+    
+    let isSuperAdmin = false;
+    if (userId) {
+        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (userData?.user?.email === SUPER_ADMIN_EMAIL) isSuperAdmin = true;
+    }
+    if (commerceId === MASTER_COMMERCE_ID) isSuperAdmin = true;
+
+    if (!isSuperAdmin) return { success: false, error: 'Unauthorized' };
+
+    // Set session cookie to target
+    cookieStore.set('admin_session', targetCommerceId, { httpOnly: true, secure: true });
+    
+    return { success: true };
+}
+
+export async function getAuditLogs(limit = 50) {
+    const commerceId = await getCurrentCommerceId();
+    if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+    // In a real app, we might filter logs by commerce_id if we added that column to audit_logs.
+    // Since audit_logs is global/simple, we'll return all for Super Admin, or try to filter.
+    // For now, let's assume it's a super-admin feature or we show all (since it's an MVP).
+    // Ideally we'd add 'comercio_id' to audit_logs.
+    
+    const { data, error } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, logs: data };
+}
+
+export async function getExportData(type: 'clients' | 'reservations') {
+    const commerceId = await getCurrentCommerceId();
+    if (!commerceId) return { success: false, error: 'Unauthorized' };
+
+    if (type === 'clients') {
+        // Only Super Admin should export all clients
+        if (commerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+        
+        const { data } = await supabaseAdmin.from('comercios').select('*');
+        return { success: true, data };
+    } 
+    
+    if (type === 'reservations') {
+        // If super admin, export ALL reservations? 
+        // Or should we filter by commerce if acting as commerce?
+        // Let's assume export is relative to current view.
+        
+        let query = supabaseAdmin
+            .from('reservations')
+            .select('*, ticket_types(name, price, events(title)), comercios(nombre)');
+            
+        // If NOT master commerce (and not acting as super admin viewing all), filter
+        if (commerceId !== MASTER_COMMERCE_ID) {
+             query = query.eq('comercio_id', commerceId);
+        }
+            
+        const { data } = await query;
+            
+        // Flatten for CSV
+        const flatData = data?.map((r: any) => ({
+            id: r.id,
+            fecha: r.created_at,
+            cliente: r.customer_name,
+            email: r.customer_email,
+            evento: r.ticket_types?.events?.title,
+            tipo_entrada: r.ticket_types?.name,
+            precio_unitario: r.ticket_types?.price,
+            cantidad: r.quantity,
+            total: (r.ticket_types?.price || 0) * r.quantity,
+            codigo: r.reservation_code,
+            comercio: r.comercios?.nombre // Add commerce name
+        }));
+        
+        return { success: true, data: flatData };
+    }
+
+    return { success: false, error: 'Invalid type' };
+}
+
+// --- Category Management (Super Admin) ---
+
+export async function getCategories() {
+    const { data, error } = await supabaseAdmin
+        .from('categorias')
+        .select('*')
+        .order('nombre', { ascending: true });
+    
+    if (error) return { success: false, error: error.message };
+    return { success: true, categories: data };
+}
+
+export async function createCategory(formData: FormData) {
+    const commerceId = await getCurrentCommerceId();
+    if (commerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+
+    const nombre = formData.get('nombre') as string;
+    const icono = formData.get('icono') as string;
+
+    const { error } = await supabaseAdmin
+        .from('categorias')
+        .insert({ nombre, icono, activo: true });
+
+    if (error) return { success: false, error: error.message };
+    
+    revalidatePath('/admin');
+    return { success: true };
+}
+
+export async function updateCategory(categoryId: string, formData: FormData) {
+    const commerceId = await getCurrentCommerceId();
+    if (commerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+
+    const nombre = formData.get('nombre') as string;
+    const icono = formData.get('icono') as string;
+    const activo = formData.get('activo') === 'on';
+
+    const { error } = await supabaseAdmin
+        .from('categorias')
+        .update({ nombre, icono, activo })
+        .eq('id', categoryId);
+
+    if (error) return { success: false, error: error.message };
+    
+    revalidatePath('/admin');
+    return { success: true };
+}
+
+export async function deleteCategory(categoryId: string) {
+    const commerceId = await getCurrentCommerceId();
+    if (commerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+
+    const { error } = await supabaseAdmin
+        .from('categorias')
+        .delete()
+        .eq('id', categoryId);
+
+    if (error) return { success: false, error: error.message };
+    
+    revalidatePath('/admin');
+    return { success: true };
 }

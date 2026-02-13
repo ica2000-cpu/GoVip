@@ -102,6 +102,17 @@ export default function EventCard({ event, relatedEvents, onReserveClick, priori
             </div>
         )}
 
+        {event.detalles_extra && Object.keys(event.detalles_extra).length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4 -mt-2">
+                {Object.entries(event.detalles_extra).map(([key, value]) => (
+                    <div key={key} className="flex items-center text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1">
+                        <span className="text-gray-500 mr-1 capitalize">{key.replace('_', ' ')}:</span>
+                        <span className="text-gray-300 font-medium">{String(value)}</span>
+                    </div>
+                ))}
+            </div>
+        )}
+
         <div className="border-t border-gray-800 pt-4 mb-6 flex-1">
           <h3 className="font-bold mb-3 text-white text-sm uppercase tracking-wide">
               {event.category === 'Rent a Car' ? 'Tarifas desde:' : 'Entradas desde:'}
