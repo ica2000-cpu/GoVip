@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Star } from 'lucide-react';
 import Link from 'next/link';
+import { Commerce } from '@/types';
 
 export const revalidate = 0;
 
@@ -12,7 +13,7 @@ export default async function Home() {
     .order('es_destacado', { ascending: false })
     .order('created_at', { ascending: false });
 
-  const safeCommerces = commerces || [];
+  const safeCommerces = (commerces as Commerce[]) || [];
 
   return (
     <div className="min-h-screen bg-black text-white">
