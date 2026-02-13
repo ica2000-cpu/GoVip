@@ -327,19 +327,19 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end bg-gray-50 p-3 rounded-lg border border-gray-100 relative group hover:border-blue-200 transition-colors">
                       <div className="flex-1 w-full">
                         <label className="block text-xs text-gray-500 mb-1 font-medium">Nombre Zona</label>
-                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-md p-2 text-sm text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: VIP" />
+                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-md p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: VIP" />
                       </div>
                       <div className="flex gap-3 w-full sm:w-auto">
                         <div className="flex-1 sm:w-28">
                           <label className="block text-xs text-gray-500 mb-1 font-medium">Precio</label>
                           <div className="relative">
-                            <span className="absolute left-2 top-2 text-gray-400 text-sm">$</span>
-                            <input type="number" required value={ticket.price} onChange={e => handleTicketChange(index, 'price', e.target.value)} className="w-full border rounded-md p-2 pl-6 text-sm text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                            <span className="absolute left-3 top-3 text-gray-400 text-sm">$</span>
+                            <input type="number" required value={ticket.price} onChange={e => handleTicketChange(index, 'price', e.target.value)} className="w-full border rounded-md p-3 pl-7 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                           </div>
                         </div>
                         <div className="flex-1 sm:w-24">
                           <label className="block text-xs text-gray-500 mb-1 font-medium">Stock</label>
-                          <input type="number" required value={ticket.stock} onChange={e => handleTicketChange(index, 'stock', e.target.value)} className="w-full border rounded-md p-2 text-sm text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                          <input type="number" required value={ticket.stock} onChange={e => handleTicketChange(index, 'stock', e.target.value)} className="w-full border rounded-md p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                         </div>
                       </div>
                       

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw } from 'lucide-react';
+import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X } from 'lucide-react';
 import { Event } from '@/types';
 import EventForm from './EventForm';
 import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent } from '@/app/admin/actions';
@@ -54,6 +54,7 @@ export default function AdminDashboard({
   const [selectedCommerces, setSelectedCommerces] = useState<string[]>([]);
   const [isDistributing, setIsDistributing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Payment Settings State
   const [country, setCountry] = useState(initialPaymentSettings?.payment_data?.country || 'AR');
@@ -257,7 +258,7 @@ export default function AdminDashboard({
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <nav className="bg-[#111] border-b border-gray-800 sticky top-0 z-10 backdrop-blur-md bg-opacity-90">
+      <nav className="bg-[#111] border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-opacity-90">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -270,7 +271,7 @@ export default function AdminDashboard({
                  <span className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                     {commerceName}
                     {isSuperAdmin && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 uppercase tracking-widest">
+                        <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 uppercase tracking-widest">
                             Super Admin
                         </span>
                     )}
@@ -278,7 +279,9 @@ export default function AdminDashboard({
                  <span className="text-xs text-gray-500 uppercase tracking-widest">Panel de Control</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center gap-2">
               <button 
                 onClick={() => setActiveTab('events')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === 'events' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
@@ -313,35 +316,100 @@ export default function AdminDashboard({
                   className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 ${activeTab === 'clients' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                 >
                   <Globe size={16} className="mr-2" />
-                  Gestión Global
+                  Clientes
                 </button>
               )}
               <button 
                 onClick={handleSync}
                 disabled={isSyncing}
-                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 border border-transparent ${isSyncing ? 'text-blue-400 bg-blue-900/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Sincronizar Web (Limpiar Caché)"
+                className={`p-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 border border-transparent ${isSyncing ? 'text-blue-400 bg-blue-900/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                title="Sincronizar Web"
               >
-                <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Sincronizando...' : 'Sincronizar Web'}
+                <RefreshCw size={18} className={`${isSyncing ? 'animate-spin' : ''}`} />
               </button>
               <button 
                 onClick={async () => {
                     await logout();
                     window.location.href = '/admin';
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200 border border-transparent hover:border-red-900/30"
+                className="p-2 rounded-lg text-sm font-medium flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200"
                 title="Cerrar Sesión"
               >
-                <LogOut size={18} className="mr-2" />
-                Salir
+                <LogOut size={18} />
               </button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="flex md:hidden items-center">
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="text-gray-300 hover:text-white p-2"
+                >
+                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+            <div className="md:hidden bg-[#0a0a0a] border-b border-gray-800">
+                <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                    <button 
+                        onClick={() => { setActiveTab('events'); setIsMobileMenuOpen(false); }}
+                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                    >
+                        Eventos
+                    </button>
+                    {isSuperAdmin && (
+                        <button 
+                            onClick={() => { setActiveTab('master_events'); setIsMobileMenuOpen(false); }}
+                            className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'master_events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                        >
+                            <span className="flex items-center"><Crown size={18} className="mr-2 text-amber-500" /> Eventos Maestros</span>
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => { setActiveTab('reservations'); setIsMobileMenuOpen(false); }}
+                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'reservations' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                    >
+                        Reservas
+                    </button>
+                    <button 
+                        onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
+                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'settings' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                    >
+                        <span className="flex items-center"><Settings size={18} className="mr-2" /> Mi Comercio</span>
+                    </button>
+                    {isSuperAdmin && (
+                        <button 
+                            onClick={() => { setActiveTab('clients'); setIsMobileMenuOpen(false); }}
+                            className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'clients' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                        >
+                             <span className="flex items-center"><Globe size={18} className="mr-2" /> Gestión de Clientes</span>
+                        </button>
+                    )}
+                    
+                    <div className="border-t border-gray-800 my-2 pt-2 flex gap-2">
+                        <button 
+                            onClick={handleSync}
+                            className="flex-1 flex items-center justify-center px-3 py-3 rounded-md text-base font-medium text-gray-300 hover:bg-white/5 bg-gray-900/50"
+                        >
+                            <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar
+                        </button>
+                        <button 
+                            onClick={async () => { await logout(); window.location.href = '/admin'; }}
+                            className="flex-1 flex items-center justify-center px-3 py-3 rounded-md text-base font-medium text-red-400 hover:bg-red-900/10 bg-red-900/5"
+                        >
+                            <LogOut size={18} className="mr-2" /> Salir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
       </nav>
 
-      <main className="max-w-[1200px] mx-auto py-8 sm:px-6 lg:px-8">
+      <main className="max-w-[1200px] mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Success Message */}
         {successMessage && (
           <div className="mb-4 p-4 bg-green-900/20 border border-green-500/50 text-green-400 rounded-lg flex items-center justify-between">
@@ -464,7 +532,8 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="bg-[#050505] shadow-xl rounded-lg overflow-hidden border border-gray-800">
-                    <div className="overflow-x-auto">
+                    {/* Desktop Table */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-800">
                             <thead className="bg-black/50">
                                 <tr>
@@ -518,13 +587,56 @@ export default function AdminDashboard({
                                                 className="text-indigo-400 hover:text-white bg-indigo-900/20 hover:bg-indigo-600 px-3 py-1.5 rounded-md transition-all border border-indigo-500/30 flex items-center gap-2 ml-auto"
                                             >
                                                 <Copy size={14} />
-                                                Distribuir a Carteleras
+                                                Distribuir
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile Cards for Master Events */}
+                    <div className="md:hidden grid grid-cols-1 gap-4 p-4">
+                        {filteredEvents.map((event) => (
+                            <div key={event.id} className="bg-[#111] border border-gray-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
+                                <div className="flex items-start gap-3">
+                                    <img src={event.image_url} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-700" />
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-white font-bold truncate">{event.title}</h3>
+                                        <p className="text-sm text-gray-500 truncate">{event.location}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-xs bg-gray-900 text-gray-300 px-2 py-0.5 rounded border border-gray-800">
+                                                {new Date(event.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                            </span>
+                                            <span className="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded border border-blue-800/30">
+                                                {event.category}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between border-t border-gray-800 pt-3 mt-1">
+                                    <div className="text-xs">
+                                        {event.ticket_types.reduce((sum, t) => sum + t.stock, 0) > 0 ? (
+                                            <span className="text-green-500 flex items-center gap-1 font-medium">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> En Venta
+                                            </span>
+                                        ) : (
+                                            <span className="text-red-500 flex items-center gap-1 font-medium">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div> Sold Out
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button 
+                                        onClick={() => initiateDistributeEvent(event)}
+                                        className="text-indigo-400 hover:text-white bg-indigo-900/20 hover:bg-indigo-600 px-3 py-2 rounded-lg transition-all border border-indigo-500/30 flex items-center gap-2 text-sm font-medium"
+                                    >
+                                        <Copy size={16} /> Distribuir
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -596,23 +708,23 @@ export default function AdminDashboard({
                   <Calendar className="mr-2" size={20} />
                   Últimas Reservas
                 </h2>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button 
                     onClick={initiateDeleteAll}
-                    className="flex items-center text-red-500 hover:text-red-400 text-sm font-medium border border-red-500/30 hover:border-red-500/80 px-3 py-1.5 rounded transition-all"
+                    className="flex items-center justify-center text-red-500 hover:text-red-400 text-sm font-medium border border-red-500/30 hover:border-red-500/80 px-3 py-2.5 rounded transition-all w-full sm:w-auto"
                     title="Borrar todas las reservas"
                   >
                     <Trash2 size={16} className="mr-2" />
                     Eliminar Todo
                   </button>
-                  <div className="relative">
+                  <div className="relative w-full sm:w-auto">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-4 w-4 text-gray-500" />
                     </div>
                     <input
                       type="text"
-                      className="pl-10 block w-full md:w-64 bg-black border-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border p-2 text-white placeholder-gray-500"
-                      placeholder="Buscar por evento o cliente..."
+                      className="pl-10 block w-full sm:w-64 bg-black border-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base sm:text-sm border p-2.5 text-white placeholder-gray-500"
+                      placeholder="Buscar..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -620,7 +732,8 @@ export default function AdminDashboard({
                 </div>
               </div>
               
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-800">
                   <thead className="bg-black">
                     <tr>
@@ -686,6 +799,52 @@ export default function AdminDashboard({
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Cards for Reservations */}
+              <div className="md:hidden grid grid-cols-1 gap-3 p-4">
+                  {filteredReservations.map((res) => (
+                      <div key={res.id} className="bg-[#111] border border-gray-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <div className="font-mono text-xs font-bold bg-white/5 text-gray-400 px-2 py-0.5 rounded border border-white/10 w-fit mb-1">
+                                      {res.reservation_code || `#${res.id}`}
+                                  </div>
+                                  <h3 className="text-white font-bold">{res.customer_name}</h3>
+                                  <p className="text-sm text-gray-500">{res.customer_email}</p>
+                              </div>
+                              <div className="text-right">
+                                  <span className="block text-2xl font-bold text-white">{res.quantity}</span>
+                                  <span className="text-xs text-gray-500 uppercase">Tickets</span>
+                              </div>
+                          </div>
+                          
+                          <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800/50">
+                              <div className="flex items-center gap-2 mb-1">
+                                  <Music size={14} className="text-blue-400" />
+                                  <span className="text-sm text-gray-300 font-medium">{res.ticket_types.events.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                                  </div>
+                                  <span className="text-sm text-gray-400">{res.ticket_types.name}</span>
+                              </div>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-gray-800 pt-3 mt-1">
+                              <span className="text-xs text-gray-600">
+                                  {new Date(res.created_at).toLocaleDateString('es-AR')} • {new Date(res.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                              <button 
+                                  onClick={() => initiateDeleteSingle(res.id)}
+                                  className="text-red-400 bg-red-900/10 hover:bg-red-900/20 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-medium text-sm border border-red-500/20"
+                              >
+                                  <Trash2 size={16} /> Eliminar
+                              </button>
+                          </div>
+                      </div>
+                  ))}
               </div>
             </div>
           </>
@@ -1011,7 +1170,8 @@ export default function AdminDashboard({
             </div>
 
             <div className="bg-[#0a0a0a] shadow-lg rounded-xl overflow-hidden border border-gray-800">
-                <div className="overflow-x-auto">
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-800">
                         <thead className="bg-black">
                             <tr>
@@ -1056,6 +1216,43 @@ export default function AdminDashboard({
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile Cards for Clients */}
+                <div className="md:hidden grid grid-cols-1 gap-4 p-4">
+                     {initialCommerces.map((client) => (
+                         <div key={client.id} className="bg-[#111] border border-gray-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+                             <div className="flex items-center gap-3">
+                                 {client.logo_url ? (
+                                     <img src={client.logo_url} className="h-12 w-12 rounded-full object-cover border border-gray-700" />
+                                 ) : (
+                                     <div className="h-12 w-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 font-bold border border-gray-700">
+                                         {client.nombre.substring(0, 2).toUpperCase()}
+                                     </div>
+                                 )}
+                                 <div className="flex-1 min-w-0">
+                                     <h3 className="text-white font-bold text-lg truncate">{client.nombre}</h3>
+                                     <p className="text-blue-400 text-sm">/{client.slug}</p>
+                                 </div>
+                                 <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-900/30 text-green-300 border border-green-800/50">
+                                     Activo
+                                 </span>
+                             </div>
+
+                             <div className="text-xs text-gray-500 border-t border-gray-800 pt-3 mt-1 flex justify-between items-center">
+                                 <span>Alta: {new Date(client.created_at).toLocaleDateString()}</span>
+                                 
+                                 {client.slug !== 'govip' && (
+                                     <button 
+                                         onClick={() => initiateDeleteCommerce(client)}
+                                         className="text-red-400 bg-red-900/10 hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border border-red-500/20"
+                                     >
+                                         <Trash2 size={14} /> Eliminar
+                                     </button>
+                                 )}
+                             </div>
+                         </div>
+                     ))}
                 </div>
             </div>
           </div>
