@@ -17,6 +17,16 @@ export const supabase = supabaseUrl && supabaseAnonKey
   : null as any;
 
 // Cliente con permisos de administrador (Service Role) - SOLO usar en el servidor
-export const supabaseAdmin = supabaseUrl && (supabaseServiceRoleKey || supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseServiceRoleKey || supabaseAnonKey)
-  : null as any;
+// IMPORTANTE: Nunca exponer esta clave en el cliente (browser)
+if (!supabaseServiceRoleKey && typeof window === 'undefined') {
+  console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations might fail or fallback to Anon (which will likely fail RLS).');
+}
+
+export const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : (null as any);
