@@ -6,6 +6,7 @@ import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard,
 import { Event } from '@/types';
 import EventForm from './EventForm';
 import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent, toggleCommerceFeatured } from '@/app/admin/actions';
+import { deployToVercel } from '@/app/admin/deploy';
 import { COUNTRIES } from '@/lib/constants';
 
 export default function AdminDashboard({ 
@@ -54,6 +55,7 @@ export default function AdminDashboard({
   const [selectedCommerces, setSelectedCommerces] = useState<string[]>([]);
   const [isDistributing, setIsDistributing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Payment Settings State
@@ -233,6 +235,26 @@ export default function AdminDashboard({
     }
   };
 
+  const handleDeploy = async () => {
+    if (!confirm('¿Iniciar despliegue a producción? Esto compilará y subirá los cambios locales.')) return;
+    
+    setIsDeploying(true);
+    try {
+        const result = await deployToVercel();
+        if (result.success) {
+            showSuccess(`¡Desplegado! Disponible en: ${result.url}`);
+            // Optional: Open in new tab
+            if (result.url) window.open(result.url, '_blank');
+        } else {
+            alert('Error en el despliegue: ' + result.message);
+        }
+    } catch (e) {
+        alert('Error inesperado al desplegar');
+    } finally {
+        setIsDeploying(false);
+    }
+  };
+
   const handleToggleFeatured = async (id: string, currentStatus: boolean) => {
     const result = await toggleCommerceFeatured(id, !currentStatus);
     if (result.success) {
@@ -330,6 +352,28 @@ export default function AdminDashboard({
                 </button>
               )}
               <button 
+                onClick={handleDeploy}
+                disabled={isDeploying}
+                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-all duration-200 border border-transparent shadow-lg ${
+                    isDeploying 
+                        ? 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30' 
+                        : 'text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500'
+                }`}
+                title="Desplegar a Producción"
+              >
+                {isDeploying ? (
+                    <>
+                        <RefreshCw size={18} className="mr-2 animate-spin" />
+                        Desplegando...
+                    </>
+                ) : (
+                    <>
+                        <Globe size={18} className="mr-2" />
+                        Publicar Cambios
+                    </>
+                )}
+              </button>
+              <button 
                 onClick={handleSync}
                 disabled={isSyncing}
                 className={`p-2 rounded-lg text-sm font-medium flex items-center transition-all duration-200 border border-transparent ${isSyncing ? 'text-blue-400 bg-blue-900/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
@@ -400,9 +444,22 @@ export default function AdminDashboard({
                         </button>
                     )}
                     
-                    <div className="border-t border-gray-800 my-2 pt-2 flex gap-2">
+                    <div className="border-t border-gray-800 my-2 pt-2 flex flex-col gap-2">
                         <button 
-                            onClick={handleSync}
+                            onClick={handleDeploy}
+                            className={`flex items-center justify-center px-3 py-4 rounded-md text-base font-bold transition-all ${
+                                isDeploying ? 'bg-yellow-900/20 text-yellow-400' : 'bg-gradient-to-r from-purple-900/50 to-indigo-900/50 text-white border border-indigo-500/30'
+                            }`}
+                        >
+                            {isDeploying ? (
+                                <><RefreshCw size={20} className="mr-2 animate-spin" /> Desplegando...</>
+                            ) : (
+                                <><Globe size={20} className="mr-2" /> Publicar Cambios</>
+                            )}
+                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={handleSync}
                             className="flex-1 flex items-center justify-center px-3 py-4 rounded-md text-base font-medium text-gray-300 hover:bg-white/5 bg-gray-900/50"
                         >
                             <RefreshCw size={20} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar
@@ -413,6 +470,7 @@ export default function AdminDashboard({
                         >
                             <LogOut size={20} className="mr-2" /> Salir
                         </button>
+                        </div>
                     </div>
                 </div>
             </div>
