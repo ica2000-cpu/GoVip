@@ -14,23 +14,38 @@ type DeployResult = {
 };
 
 export async function deployToVercel(): Promise<DeployResult> {
-  // Security Check: Only allow this in development (localhost)
-  // This prevents the deployed version from trying to deploy itself recursively
-  if (process.env.NODE_ENV !== 'development') {
-    return {
-      success: false,
-      message: 'Esta función solo está disponible en el entorno local de desarrollo.'
-    };
-  }
-
   const logs: string[] = [];
   const log = (msg: string) => {
     console.log(`[Deploy] ${msg}`);
     logs.push(msg);
   };
 
+  // Check if we are running on Vercel (Production)
+  // Vercel sets the 'VERCEL' env var to '1'
+  if (process.env.VERCEL === '1') {
+      try {
+          log('Entorno Vercel detectado.');
+          log('Sincronizando caché y datos...');
+          
+          revalidatePath('/', 'layout');
+          
+          return {
+              success: true,
+              message: 'Sincronización de datos completada (En producción no se puede recompilar el código fuente, solo actualizar datos).',
+              logs
+          };
+      } catch (error: any) {
+          return {
+              success: false,
+              message: 'Error al sincronizar en producción: ' + error.message,
+              logs
+          };
+      }
+  }
+
+  // Local Development Logic
   try {
-    log('Iniciando proceso de despliegue optimizado...');
+    log('Iniciando proceso de despliegue optimizado desde Local...');
 
     // 1. Git Sync
     log('1/4 Sincronizando con Git...');
