@@ -3,9 +3,12 @@ import { Star } from 'lucide-react';
 import Link from 'next/link';
 import { Commerce } from '@/types';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
+  console.log('Rendering Home Page');
   // Fetch all commerces, prioritized by es_destacado
   const { data: commerces, error } = await supabase
     .from('comercios')
@@ -99,12 +102,6 @@ export default async function Home() {
 
       <footer className="border-t border-gray-800 bg-[#050505] py-12 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="mb-6 flex justify-center gap-6 text-sm text-gray-500">
-                <Link href="/instalar" className="hover:text-white transition-colors flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    Instalar App
-                </Link>
-            </div>
             <p className="text-gray-500 text-sm">
                 &copy; {new Date().getFullYear()} GoVip. Plataforma de Gestión de Eventos.
             </p>

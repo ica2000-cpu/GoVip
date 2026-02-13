@@ -35,8 +35,6 @@ export const metadata: Metadata = {
   },
 };
 
-import InstallPrompt from "@/components/InstallPrompt";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -48,7 +46,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white min-h-screen`}
       >
         {children}
-        <InstallPrompt />
       </body>
     </html>
   );
