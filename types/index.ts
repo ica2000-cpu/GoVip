@@ -15,4 +15,16 @@ export type Event = {
   category: string;
   image_url: string;
   ticket_types: TicketType[];
+  comercio_id?: string;
+}
+
+export type Commerce = {
+  id: string;
+  nombre: string;
+  slug: string;
+  owner_id: string;
+  logo_url?: string;
+  es_destacado: boolean;
+  created_at: string;
+  payment_data?: any;
 }

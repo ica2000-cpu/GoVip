@@ -806,6 +806,7 @@ export async function getAllCommerces() {
       const { data: commerces, error } = await supabaseAdmin
         .from('comercios')
         .select('*')
+        .order('es_destacado', { ascending: false }) // Prioritize featured
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -813,6 +814,27 @@ export async function getAllCommerces() {
       return { success: true, commerces };
   } catch (error: any) {
       console.error('Error fetching commerces:', error);
+      return { success: false, error: error.message };
+  }
+}
+
+export async function toggleCommerceFeatured(targetCommerceId: string, status: boolean) {
+  const currentCommerceId = await getCurrentCommerceId();
+  if (currentCommerceId !== MASTER_COMMERCE_ID) return { success: false, error: 'Unauthorized' };
+
+  try {
+      const { error } = await supabaseAdmin
+        .from('comercios')
+        .update({ es_destacado: status })
+        .eq('id', targetCommerceId);
+
+      if (error) throw error;
+
+      revalidatePath('/admin');
+      revalidatePath('/'); // Update home page
+      return { success: true };
+  } catch (error: any) {
+      console.error('Toggle featured error:', error);
       return { success: false, error: error.message };
   }
 }

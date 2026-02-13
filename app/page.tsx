@@ -1,130 +1,110 @@
 import { supabase } from '@/lib/supabase';
-import EventList from '@/components/EventList';
-import { Event } from '@/types';
-import { getPaymentSettings } from '@/app/actions/public';
-import { MASTER_COMMERCE_ID } from '@/lib/constants';
+import { Star } from 'lucide-react';
+import Link from 'next/link';
 
 export const revalidate = 0;
 
 export default async function Home() {
-  // Directly load Master Commerce (govip) data
-  // This replaces the redirect to avoid 404s and flickering
-  
-  // 1. Fetch Commerce Data (We know it's Master, but let's be safe and consistent)
-  const { data: commerce, error: commerceError } = await supabase
+  // Fetch all commerces, prioritized by es_destacado
+  const { data: commerces, error } = await supabase
     .from('comercios')
     .select('*')
-    .eq('id', MASTER_COMMERCE_ID)
-    .single();
+    .order('es_destacado', { ascending: false })
+    .order('created_at', { ascending: false });
 
-  if (commerceError || !commerce) {
-    console.error('Master Commerce not found:', commerceError);
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <div className="text-center p-8 bg-[#111] rounded-xl shadow-lg border border-red-900 max-w-md">
-          <h3 className="text-xl font-bold text-red-500 mb-2">Error Crítico</h3>
-          <p className="text-gray-400">No se pudo cargar el comercio principal.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Fetch Events for Master Commerce
-  const { data: events, error: eventsError } = await supabase
-    .from('events')
-    .select('*, ticket_types(*)')
-    .eq('comercio_id', MASTER_COMMERCE_ID)
-    .order('date', { ascending: true });
-
-  const safeEvents = events || [];
-
-  // 3. Payment Settings
-  const paymentSettings = {
-      cbu: commerce.cbu,
-      alias: commerce.alias,
-      account_number: commerce.nombre_titular,
-      payment_data: commerce.payment_data,
-      whatsapp_number: commerce.whatsapp_number,
-      commerce_logo: commerce.logo_url,
-      commerce_name: commerce.nombre
-  };
-
-  console.log('[Server Home] Payment Settings:', { 
-      hasWhatsapp: !!paymentSettings.whatsapp_number, 
-      number: paymentSettings.whatsapp_number 
-  });
+  const safeCommerces = commerces || [];
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Dynamic Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-black/30 border-b border-white/10">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             {commerce.logo_url ? (
-                 <img src={commerce.logo_url} alt={`${commerce.nombre} Logo`} className="h-12 w-auto object-contain" />
-             ) : (
-                 <span className="text-xl font-bold tracking-tighter">{commerce.nombre}</span>
-             )}
+      {/* Hero Section */}
+      <div className="relative bg-gradient-to-b from-gray-900 to-black py-24 px-4 overflow-hidden border-b border-gray-800">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 bg-blue-900/30 border border-blue-800/50 px-4 py-1.5 rounded-full mb-6">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            <span className="text-sm font-medium text-blue-300 tracking-wide uppercase">Plataforma Oficial</span>
           </div>
-          <nav className="hidden md:flex gap-6 text-sm font-light tracking-wide text-gray-300">
-          </nav>
-        </div>
-      </header>
-
-      {/* Dynamic Hero Section */}
-      <div className="relative bg-gradient-to-b from-gray-900 to-black text-white py-24 overflow-hidden border-b border-gray-800">
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight text-white">
-            {commerce.nombre}
+          
+          <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-500">
+            GoVip
           </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Reserva tus entradas para los mejores eventos de {commerce.nombre}.
+          <p className="text-xl md:text-2xl text-gray-400 max-w-2xl mx-auto leading-relaxed font-light">
+            Descubre y reserva tus entradas para los mejores eventos, conciertos y experiencias exclusivas.
           </p>
-          <div className="flex justify-center gap-4">
-            <a href="#events" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold transition-all transform hover:scale-105 shadow-lg">
-              Ver Cartelera
-            </a>
-          </div>
+        </div>
+        
+        {/* Abstract Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
+            <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600 rounded-full blur-[128px]"></div>
+            <div className="absolute top-1/2 right-0 w-64 h-64 bg-purple-600 rounded-full blur-[128px]"></div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main id="events" className="container mx-auto px-4 py-20 bg-black">
-        <div className="flex items-end justify-between mb-12 border-b border-gray-800 pb-6">
-          <div>
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase mb-2">Próximos Eventos</h2>
-            <p className="text-gray-400 text-lg font-medium">Cartelera Oficial</p>
-          </div>
+      {/* Commerces Grid */}
+      <main className="max-w-7xl mx-auto px-4 py-16">
+        <div className="flex items-center gap-3 mb-10">
+            <div className="h-8 w-1 bg-blue-600 rounded-full"></div>
+            <h2 className="text-3xl font-bold text-white tracking-tight">Nuestros Clientes</h2>
         </div>
 
-        <EventList events={safeEvents as Event[]} paymentSettings={paymentSettings} />
+        {safeCommerces.length === 0 ? (
+            <div className="text-center py-20 bg-[#111] rounded-2xl border border-gray-800">
+                <p className="text-gray-500 text-lg">Próximamente...</p>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {safeCommerces.map((commerce) => (
+                    <Link 
+                        key={commerce.id} 
+                        href={`/${commerce.slug}`}
+                        className="group relative bg-[#111] border border-gray-800 rounded-2xl p-6 hover:border-blue-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/10 flex flex-col items-center text-center overflow-hidden"
+                    >
+                        {/* Featured Badge */}
+                        {commerce.es_destacado && (
+                            <div className="absolute top-4 right-4 bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/20 flex items-center gap-1 shadow-sm">
+                                <Star size={12} fill="currentColor" />
+                                <span>DESTACADO</span>
+                            </div>
+                        )}
+
+                        <div className="mb-6 relative">
+                            {commerce.logo_url ? (
+                                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-700 group-hover:border-blue-500 transition-colors bg-black shadow-xl">
+                                    <img src={commerce.logo_url} alt={commerce.nombre} className="w-full h-full object-cover" />
+                                </div>
+                            ) : (
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center text-2xl font-bold text-gray-500 border-2 border-gray-700 group-hover:border-blue-500 transition-colors">
+                                    {commerce.nombre.substring(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+
+                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                            {commerce.nombre}
+                        </h3>
+                        
+                        <p className="text-sm text-gray-500 mb-6 font-mono">
+                            govip.com/{commerce.slug}
+                        </p>
+
+                        <div className="w-full mt-auto">
+                            <span className="block w-full py-3 bg-gray-900 text-gray-300 rounded-lg text-sm font-medium group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                Ver Cartelera
+                            </span>
+                        </div>
+                    </Link>
+                ))}
+            </div>
+        )}
       </main>
 
-      {/* Dynamic Footer */}
-      <footer className="bg-black border-t border-gray-800 py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-            <div className="flex items-center gap-2 mb-4 md:mb-0">
-               {commerce.logo_url && (
-                  <img src={commerce.logo_url} alt="Logo" className="h-10 w-auto grayscale opacity-80 hover:opacity-100 transition-opacity" />
-               )}
-               <span className="text-gray-500 font-bold ml-2">{commerce.nombre}</span>
-            </div>
-            <div className="text-center md:text-right">
-                <p className="text-sm text-gray-400 mb-1">¿Quieres impulsar tu marca?</p>
-                <a href="mailto:goviporiginal@gmail.com" className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
-                    Publicidad y Gestión Integral: goviporiginal@gmail.com
-                </a>
-            </div>
-          </div>
-          <div className="border-t border-gray-900 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-gray-600">
-            <div>
-              &copy; {new Date().getFullYear()} {commerce.nombre}. Todos los derechos reservados.
-            </div>
-            <div className="mt-2 md:mt-0">
-               Powered by <span className="text-gray-500 font-bold">GoVip</span>
-            </div>
-          </div>
+      <footer className="border-t border-gray-800 bg-[#050505] py-12 mt-12">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+            <p className="text-gray-500 text-sm">
+                &copy; {new Date().getFullYear()} GoVip. Plataforma de Gestión de Eventos.
+            </p>
         </div>
       </footer>
     </div>

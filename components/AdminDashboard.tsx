@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X } from 'lucide-react';
+import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X, Star } from 'lucide-react';
 import { Event } from '@/types';
 import EventForm from './EventForm';
-import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent } from '@/app/admin/actions';
+import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent, toggleCommerceFeatured } from '@/app/admin/actions';
 import { COUNTRIES } from '@/lib/constants';
 
 export default function AdminDashboard({ 
@@ -230,6 +230,16 @@ export default function AdminDashboard({
         showSuccess('Web actualizada con los últimos datos de la base de datos');
     } else {
         alert('Error al sincronizar: ' + result.error);
+    }
+  };
+
+  const handleToggleFeatured = async (id: string, currentStatus: boolean) => {
+    const result = await toggleCommerceFeatured(id, !currentStatus);
+    if (result.success) {
+        showSuccess(!currentStatus ? 'Comercio destacado' : 'Comercio quitado de destacados');
+        router.refresh();
+    } else {
+        alert('Error: ' + result.error);
     }
   };
 
@@ -1201,6 +1211,13 @@ export default function AdminDashboard({
                                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900/30 text-green-300 border border-green-800/50">
                                                 Activo
                                             </span>
+                                            <button
+                                                onClick={() => handleToggleFeatured(client.id, client.es_destacado)}
+                                                className={`p-1 rounded-full transition-colors ${client.es_destacado ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'}`}
+                                                title={client.es_destacado ? 'Quitar Destacado' : 'Destacar'}
+                                            >
+                                                <Star size={16} fill={client.es_destacado ? "currentColor" : "none"} />
+                                            </button>
                                             {client.slug !== 'govip' && (
                                                 <button 
                                                     onClick={() => initiateDeleteCommerce(client)}
@@ -1242,14 +1259,24 @@ export default function AdminDashboard({
                              <div className="text-xs text-gray-500 border-t border-gray-800 pt-3 mt-1 flex justify-between items-center">
                                  <span>Alta: {new Date(client.created_at).toLocaleDateString()}</span>
                                  
-                                 {client.slug !== 'govip' && (
+                                 <div className="flex items-center gap-2">
                                      <button 
-                                         onClick={() => initiateDeleteCommerce(client)}
-                                         className="text-red-400 bg-red-900/10 hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border border-red-500/20"
+                                         onClick={() => handleToggleFeatured(client.id, client.es_destacado)}
+                                         className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border ${client.es_destacado ? 'bg-amber-900/20 text-amber-400 border-amber-500/30' : 'bg-gray-800 text-gray-400 border-gray-700'}`}
                                      >
-                                         <Trash2 size={14} /> Eliminar
+                                         <Star size={14} fill={client.es_destacado ? "currentColor" : "none"} />
+                                         {client.es_destacado ? 'Destacado' : 'Destacar'}
                                      </button>
-                                 )}
+
+                                     {client.slug !== 'govip' && (
+                                         <button 
+                                             onClick={() => initiateDeleteCommerce(client)}
+                                             className="text-red-400 bg-red-900/10 hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-medium border border-red-500/20"
+                                         >
+                                             <Trash2 size={14} /> Eliminar
+                                         </button>
+                                     )}
+                                 </div>
                              </div>
                          </div>
                      ))}
