@@ -3,11 +3,51 @@ import EventList from '@/components/EventList';
 import { Event } from '@/types';
 import { notFound } from 'next/navigation';
 import { getPaymentSettings } from '@/app/actions/public';
+import { Metadata, ResolvingMetadata } from 'next';
 
-// Force dynamic rendering since we depend on slug
-export const dynamic = 'force-dynamic';
+// Revalidate every 60 seconds (ISR) for better performance
+export const revalidate = 60;
+// export const dynamic = 'force-dynamic'; // Removed in favor of ISR
 
-export default async function CommercePage({ params }: { params: Promise<{ slug: string }> }) {
+type Props = {
+  params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata(
+  { params }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const resolvedParams = await params;
+  const slug = resolvedParams?.slug;
+  
+  if (!slug || slug === 'undefined') {
+    return {
+      title: 'GoVip - Plataforma de Eventos',
+    };
+  }
+
+  const { data: commerce } = await supabase
+    .from('comercios')
+    .select('nombre, logo_url')
+    .eq('slug', slug)
+    .single();
+
+  if (!commerce) {
+    return {
+      title: 'Comercio No Encontrado - GoVip',
+    };
+  }
+
+  return {
+    title: `${commerce.nombre} | Entradas y Reservas - GoVip`,
+    description: `Reserva tus entradas oficiales para los mejores eventos de ${commerce.nombre}. Gestión segura y rápida con GoVip.`,
+    openGraph: {
+      images: commerce.logo_url ? [commerce.logo_url] : [],
+    },
+  };
+}
+
+export default async function CommercePage({ params }: Props) {
   // Await params for Next.js 15+ compatibility
   const resolvedParams = await params;
   const slug = resolvedParams?.slug;

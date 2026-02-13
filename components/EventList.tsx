@@ -92,7 +92,7 @@ export default function EventList({
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-        {Object.values(groupedEvents).map((group) => {
+        {Object.values(groupedEvents).map((group, index) => {
           // Sort group by date
           const sortedGroup = group.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
           const mainEvent = sortedGroup[0];
@@ -102,7 +102,8 @@ export default function EventList({
               key={mainEvent.id} 
               event={mainEvent}
               relatedEvents={sortedGroup.length > 1 ? sortedGroup : undefined}
-              onReserveClick={handleEventClick} 
+              onReserveClick={handleEventClick}
+              priority={index < 4}
             />
           );
         })}

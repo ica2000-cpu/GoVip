@@ -9,6 +9,7 @@ interface EventCardProps {
   event: Event;
   relatedEvents?: Event[]; // Array of all events in the group (different dates)
   onReserveClick: (event: Event, relatedEvents?: Event[]) => void;
+  priority?: boolean;
 }
 
 // Hydration-safe helpers
@@ -29,7 +30,7 @@ function formatDate(dateStr: string) {
   return `${day} ${months[monthIndex] || ''}`;
 }
 
-export default function EventCard({ event, relatedEvents, onReserveClick }: EventCardProps) {
+export default function EventCard({ event, relatedEvents, onReserveClick, priority = false }: EventCardProps) {
   const [imgSrc, setImgSrc] = useState(event.image_url);
 
   return (
@@ -39,6 +40,7 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
           src={imgSrc} 
           alt={event.title} 
           fill
+          priority={priority}
           className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           onError={() => setImgSrc('https://images.unsplash.com/photo-1459749411177-287ce3288b71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')} // Fallback image

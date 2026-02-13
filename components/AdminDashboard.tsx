@@ -463,6 +463,7 @@ export default function AdminDashboard({
                             onClick={() => initiateDistributeEvent(event)}
                             className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-indigo-600 text-indigo-300 hover:text-white border border-white/10"
                             title="Distribuir Evento"
+                            aria-label="Distribuir Evento"
                           >
                             <Share2 size={16} />
                           </button>
@@ -471,6 +472,7 @@ export default function AdminDashboard({
                         onClick={() => handleDuplicateEvent(event)}
                         className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-gray-300 hover:text-white border border-white/10"
                         title="Duplicar Evento"
+                        aria-label="Duplicar Evento"
                       >
                         <Copy size={16} />
                       </button>
@@ -478,6 +480,7 @@ export default function AdminDashboard({
                         onClick={() => initiateResetStock(event.id)}
                         className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-green-400 hover:text-green-300 border border-white/10"
                         title="Restablecer Stock"
+                        aria-label="Restablecer Stock"
                       >
                         <RotateCcw size={16} />
                       </button>
@@ -485,6 +488,7 @@ export default function AdminDashboard({
                         onClick={() => { setEditingEvent(event); setShowEventForm(true); }}
                         className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-blue-400 hover:text-blue-300 border border-white/10"
                         title="Editar"
+                        aria-label="Editar Evento"
                       >
                         <Edit size={16} />
                       </button>
@@ -492,6 +496,7 @@ export default function AdminDashboard({
                         onClick={() => handleDeleteEvent(event.id)}
                         className="p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black text-red-400 hover:text-red-300 border border-white/10"
                         title="Eliminar"
+                        aria-label="Eliminar Evento"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -689,6 +694,7 @@ export default function AdminDashboard({
                             onClick={() => initiateResetStock(item.event_id)}
                             className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-900/20 rounded-full transition-colors"
                             title="Restablecer Stock del Evento"
+                            aria-label="Restablecer Stock del Evento"
                           >
                             <RotateCcw size={18} />
                           </button>
@@ -801,6 +807,7 @@ export default function AdminDashboard({
                             onClick={() => initiateDeleteSingle(res.id)}
                             className="text-red-500 hover:text-red-400 p-2 hover:bg-red-900/20 rounded-full transition-colors"
                             title="Eliminar Reserva"
+                            aria-label="Eliminar Reserva"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1215,6 +1222,7 @@ export default function AdminDashboard({
                                                 onClick={() => handleToggleFeatured(client.id, client.es_destacado)}
                                                 className={`p-1 rounded-full transition-colors ${client.es_destacado ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'}`}
                                                 title={client.es_destacado ? 'Quitar Destacado' : 'Destacar'}
+                                                aria-label={client.es_destacado ? 'Quitar Destacado' : 'Destacar'}
                                             >
                                                 <Star size={16} fill={client.es_destacado ? "currentColor" : "none"} />
                                             </button>
@@ -1223,6 +1231,7 @@ export default function AdminDashboard({
                                                     onClick={() => initiateDeleteCommerce(client)}
                                                     className="text-red-500 hover:text-red-400 p-1 hover:bg-red-900/20 rounded-full transition-colors ml-2"
                                                     title="Eliminar Cliente"
+                                                    aria-label="Eliminar Cliente"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
