@@ -10,8 +10,9 @@ export const dynamic = 'force-dynamic';
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    // Use placeholders if env vars are missing to prevent build crash
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
   ));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
