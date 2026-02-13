@@ -34,6 +34,10 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
   const [imageUrl, setImageUrl] = useState(event?.image_url || '');
   const [category, setCategory] = useState(event?.category || 'Recital');
   const [previewUrl, setPreviewUrl] = useState(event?.image_url || '');
+  
+  // New Fields
+  const [duration, setDuration] = useState(event?.duration || '');
+  const [reservationFee, setReservationFee] = useState(event?.reservation_fee?.toString() || '');
 
   const handleAddDate = () => {
     setDates([...dates, '']);
@@ -198,6 +202,10 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
     formData.append('imageUrl', imageUrl);
     formData.append('category', category);
     formData.append('ticketTypes', JSON.stringify(ticketTypes));
+    
+    // Append new fields
+    formData.append('duration', duration);
+    formData.append('reservationFee', reservationFee);
 
     let result;
     // Check if event has ID to determine create vs update
@@ -241,12 +249,46 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                     <option value="Recital">Recital</option>
                     <option value="Deporte">Deporte</option>
                     <option value="Teatro">Teatro</option>
+                    <option value="Restaurante">Restaurante</option>
+                    <option value="Rent a Car">Rent a Car</option>
+                    <option value="Excursiones">Excursiones</option>
                   </select>
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {category === 'Rent a Car' ? 'Ubicación de recogida' : 
+                       category === 'Excursiones' ? 'Punto de salida' : 'Ubicación'}
+                  </label>
                   <input type="text" required value={location} onChange={e => setLocation(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" />
                 </div>
+
+                {category === 'Excursiones' && (
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Duración</label>
+                        <input 
+                            type="text" 
+                            value={duration} 
+                            onChange={e => setDuration(e.target.value)} 
+                            placeholder="Ej: 4 horas"
+                            className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
+                        />
+                    </div>
+                )}
+
+                {category === 'Restaurante' && (
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Seña de Reserva (Monto)</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-3 text-gray-400 text-sm mt-0.5">$</span>
+                            <input 
+                                type="number" 
+                                value={reservationFee} 
+                                onChange={e => setReservationFee(e.target.value)} 
+                                className="w-full border rounded-lg p-3 pl-7 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className="col-span-1 md:col-span-2 border-t pt-4">
                    <div className="flex justify-between items-center mb-2">
@@ -317,21 +359,30 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
 
               <div className="border-t pt-4">
                 <h3 className="font-semibold mb-3 text-gray-900 flex items-center">
-                  <span>Zonas y Precios (Ticket Types)</span>
+                  <span>
+                    {category === 'Rent a Car' ? 'Tipos de Vehículo y Tarifas' : 
+                     category === 'Restaurante' ? 'Mesas y Capacidades' : 
+                     'Zonas y Precios (Ticket Types)'}
+                  </span>
                   <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {ticketTypes.length} zonas
+                    {ticketTypes.length} {category === 'Rent a Car' ? 'vehículos' : category === 'Restaurante' ? 'mesas' : 'zonas'}
                   </span>
                 </h3>
                 <div className="space-y-4">
                   {ticketTypes.map((ticket, index) => (
                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end bg-gray-50 p-3 rounded-lg border border-gray-100 relative group hover:border-blue-200 transition-colors">
                       <div className="flex-1 w-full">
-                        <label className="block text-xs text-gray-500 mb-1 font-medium">Nombre Zona</label>
-                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" placeholder="Ej: VIP" />
+                        <label className="block text-xs text-gray-500 mb-1 font-medium">
+                            {category === 'Rent a Car' ? 'Modelo / Tipo' : 
+                             category === 'Restaurante' ? 'Tipo de Mesa' : 'Nombre Zona'}
+                        </label>
+                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" placeholder={category === 'Rent a Car' ? "Ej: Sedán Compacto" : "Ej: VIP"} />
                       </div>
                       <div className="flex gap-3 w-full sm:w-auto">
                         <div className="flex-1 sm:w-28">
-                          <label className="block text-xs text-gray-500 mb-1 font-medium">Precio</label>
+                          <label className="block text-xs text-gray-500 mb-1 font-medium">
+                              {category === 'Rent a Car' ? 'Precio por día' : 'Precio'}
+                          </label>
                           <div className="relative">
                             <span className="absolute left-3 top-3 text-gray-400 text-sm mt-0.5">$</span>
                             <input type="number" required value={ticket.price} onChange={e => handleTicketChange(index, 'price', e.target.value)} className="w-full border rounded-lg p-3 pl-7 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" />

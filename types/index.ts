@@ -16,6 +16,8 @@ export type Event = {
   image_url: string;
   ticket_types: TicketType[];
   comercio_id?: string;
+  duration?: string;
+  reservation_fee?: number;
 }
 
 export type Commerce = {

@@ -176,6 +176,10 @@ export async function createEvent(formData: FormData) {
   const imageUrl = formData.get('imageUrl') as string;
   const category = formData.get('category') as string;
   const ticketTypes = JSON.parse(formData.get('ticketTypes') as string);
+  
+  // New Fields
+  const duration = formData.get('duration') as string;
+  const reservationFee = formData.get('reservationFee') as string;
 
   // Filter out any "empty" dates that might have slipped through (e.g. empty strings)
   let dates: string[] = [];
@@ -224,7 +228,9 @@ export async function createEvent(formData: FormData) {
             date: dateStr,
             image_url: imageUrl,
             category,
-            comercio_id: commerceId // Assign to current commerce
+            comercio_id: commerceId, // Assign to current commerce
+            duration: duration || null,
+            reservation_fee: reservationFee ? Number(reservationFee) : null
         })
         .select()
         .single();
@@ -298,6 +304,10 @@ export async function updateEvent(eventId: number, formData: FormData) {
   const imageUrl = formData.get('imageUrl') as string;
   const category = formData.get('category') as string;
   const ticketTypes = JSON.parse(formData.get('ticketTypes') as string);
+  
+  // New Fields
+  const duration = formData.get('duration') as string;
+  const reservationFee = formData.get('reservationFee') as string;
 
   let dates: string[] = [];
   try { dates = JSON.parse(formData.get('dates') as string); } catch (e) {}
@@ -348,7 +358,9 @@ export async function updateEvent(eventId: number, formData: FormData) {
                     location,
                     date: dateStr,
                     image_url: imageUrl,
-                    category
+                    category,
+                    duration: duration || null,
+                    reservation_fee: reservationFee ? Number(reservationFee) : null
                 })
                 .eq('id', idToUpdate)
                 .eq('comercio_id', commerceId); // Redundant but safe
@@ -375,7 +387,9 @@ export async function updateEvent(eventId: number, formData: FormData) {
                     date: dateStr,
                     image_url: imageUrl,
                     category,
-                    comercio_id: commerceId // Ensure new events belong to commerce
+                    comercio_id: commerceId, // Ensure new events belong to commerce
+                    duration: duration || null,
+                    reservation_fee: reservationFee ? Number(reservationFee) : null
                 })
                 .select()
                 .single();

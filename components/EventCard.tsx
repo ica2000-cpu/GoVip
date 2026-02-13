@@ -73,16 +73,34 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
 
         <div className="flex items-center text-sm text-gray-400 mb-6 font-medium">
           <MapPin size={16} className="mr-2 text-blue-500" />
-          {event.location}
+          {event.category === 'Rent a Car' ? `Retiro: ${event.location}` : event.location}
         </div>
+        
+        {event.duration && (
+            <div className="flex items-center text-sm text-gray-400 mb-4 font-medium -mt-4">
+                <span className="bg-gray-800 px-2 py-1 rounded text-xs mr-2 border border-gray-700">Duración</span>
+                {event.duration}
+            </div>
+        )}
+
+        {event.reservation_fee && (
+            <div className="flex items-center text-sm text-gray-400 mb-4 font-medium -mt-4">
+                 <span className="bg-green-900/30 text-green-400 px-2 py-1 rounded text-xs mr-2 border border-green-800">Seña</span>
+                 {formatMoney(event.reservation_fee)}
+            </div>
+        )}
+
         <div className="border-t border-gray-800 pt-4 mb-6 flex-1">
-          <h3 className="font-bold mb-3 text-white text-sm uppercase tracking-wide">Entradas desde:</h3>
+          <h3 className="font-bold mb-3 text-white text-sm uppercase tracking-wide">
+              {event.category === 'Rent a Car' ? 'Tarifas desde:' : 'Entradas desde:'}
+          </h3>
           <ul className="space-y-2">
             {event.ticket_types.map((ticket) => (
               <li key={ticket.id} className="flex justify-between text-sm text-gray-400">
                 <span className="font-medium">{ticket.name}</span>
                 <span className="font-bold text-white">
                   {formatMoney(ticket.price)}
+                  {event.category === 'Rent a Car' ? '/día' : ''}
                 </span>
               </li>
             ))}
@@ -92,7 +110,9 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
           onClick={() => onReserveClick(event, relatedEvents)}
           className="w-full bg-blue-600 text-white font-bold py-3.5 px-4 rounded-lg hover:bg-blue-500 hover:shadow-[0_0_15px_rgba(37,99,235,0.5)] transition-all mt-auto uppercase tracking-wide"
         >
-          Reservar Entradas
+          {event.category === 'Rent a Car' ? 'Reserva de Vehículo' : 
+           event.category === 'Restaurante' ? 'Reserva de Mesa' : 
+           'Reservar Entradas'}
         </button>
       </div>
     </div>
