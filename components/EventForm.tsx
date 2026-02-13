@@ -233,11 +233,11 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                  <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" />
                 </div>
                 <div className="col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm bg-white">
                     <option value="Recital">Recital</option>
                     <option value="Deporte">Deporte</option>
                     <option value="Teatro">Teatro</option>
@@ -245,7 +245,7 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                 </div>
                 <div className="col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
-                  <input type="text" required value={location} onChange={e => setLocation(e.target.value)} className="w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <input type="text" required value={location} onChange={e => setLocation(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" />
                 </div>
 
                 <div className="col-span-1 md:col-span-2 border-t pt-4">
@@ -270,16 +270,16 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                                type="date" 
                                value={date}  
                                onChange={e => handleDateChange(index, e.target.value, 'date')} 
-                               className="flex-1 border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                               className="flex-1 border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" 
                              />
                              <div className="relative w-full sm:w-32">
                                  <input 
                                    type="time" 
                                    value={time} 
                                    onChange={e => handleDateChange(index, e.target.value, 'time')} 
-                                   className="w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                                   className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" 
                                  />
-                                 <span className="absolute -top-2 right-1 bg-white px-1 text-[10px] text-gray-400 rounded">Opcional</span>
+                                 <span className="absolute -top-2 right-1 bg-white px-1 text-[10px] text-gray-400 rounded border border-gray-200">Opcional</span>
                              </div>
                          </div>
                          <button type="button" onClick={() => handleRemoveDate(index)} className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded transition-colors self-end sm:self-auto">
@@ -299,7 +299,7 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                       required 
                       value={imageUrl} 
                       onChange={e => handleImageChange(e.target.value)} 
-                      className="flex-1 w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
+                      className="flex-1 w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
                       placeholder="https://..." 
                     />
                     {previewUrl && (
@@ -311,7 +311,7 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                 </div>
                 <div className="col-span-1 md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                  <textarea required rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-md p-2 text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <textarea required rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" />
                 </div>
               </div>
 
@@ -327,19 +327,19 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end bg-gray-50 p-3 rounded-lg border border-gray-100 relative group hover:border-blue-200 transition-colors">
                       <div className="flex-1 w-full">
                         <label className="block text-xs text-gray-500 mb-1 font-medium">Nombre Zona</label>
-                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-md p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: VIP" />
+                        <input type="text" required value={ticket.name} onChange={e => handleTicketChange(index, 'name', e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" placeholder="Ej: VIP" />
                       </div>
                       <div className="flex gap-3 w-full sm:w-auto">
                         <div className="flex-1 sm:w-28">
                           <label className="block text-xs text-gray-500 mb-1 font-medium">Precio</label>
                           <div className="relative">
-                            <span className="absolute left-3 top-3 text-gray-400 text-sm">$</span>
-                            <input type="number" required value={ticket.price} onChange={e => handleTicketChange(index, 'price', e.target.value)} className="w-full border rounded-md p-3 pl-7 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                            <span className="absolute left-3 top-3 text-gray-400 text-sm mt-0.5">$</span>
+                            <input type="number" required value={ticket.price} onChange={e => handleTicketChange(index, 'price', e.target.value)} className="w-full border rounded-lg p-3 pl-7 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" />
                           </div>
                         </div>
                         <div className="flex-1 sm:w-24">
                           <label className="block text-xs text-gray-500 mb-1 font-medium">Stock</label>
-                          <input type="number" required value={ticket.stock} onChange={e => handleTicketChange(index, 'stock', e.target.value)} className="w-full border rounded-md p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                          <input type="number" required value={ticket.stock} onChange={e => handleTicketChange(index, 'stock', e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm h-12" />
                         </div>
                       </div>
                       

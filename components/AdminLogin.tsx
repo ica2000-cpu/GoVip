@@ -22,7 +22,7 @@ export default function AdminLogin({ onLogin }: { onLogin: (email: string, passw
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="bg-[#111] border border-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+      <div className="bg-[#111] border border-gray-800 p-4 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
         <div className="flex justify-center mb-6">
           <div className="bg-blue-900/20 p-4 rounded-full text-blue-500 border border-blue-500/20">
             <Lock size={32} />
@@ -43,7 +43,7 @@ export default function AdminLogin({ onLogin }: { onLogin: (email: string, passw
                     setEmail(e.target.value);
                     setError(false);
                 }}
-                className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-600 focus:border-transparent text-white placeholder-gray-700 transition-all"
+                className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-600 focus:border-transparent text-white placeholder-gray-700 transition-all h-12"
                 placeholder="admin@govip.com"
                 required
                 />
@@ -61,7 +61,7 @@ export default function AdminLogin({ onLogin }: { onLogin: (email: string, passw
                     setPassword(e.target.value);
                     setError(false);
                 }}
-                className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-600 focus:border-transparent text-white placeholder-gray-700 transition-all"
+                className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-600 focus:border-transparent text-white placeholder-gray-700 transition-all h-12"
                 placeholder="••••••••"
                 required
                 />
@@ -75,7 +75,7 @@ export default function AdminLogin({ onLogin }: { onLogin: (email: string, passw
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-500 transition-all font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-500 transition-all font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed mt-2 h-12"
           >
             {loading ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
