@@ -899,9 +899,12 @@ export async function deleteCommerce(targetCommerceId: string) {
           return { success: false, error: 'Comercio no encontrado' };
       }
 
-      // 2. Explicit Cleanup of Related Data (to ensure no orphans/storage waste)
-      
-      // 2a. Delete Reservations
+      console.log(`Starting deletion of commerce: ${commerce.nombre} (${targetCommerceId})`);
+
+      // 2. Explicit Cleanup of Related Data
+      // Order is critical: Reservations -> Ticket Types -> Events -> Commerce
+
+      // 2a. Delete Reservations (FK to comercios AND ticket_types)
       const { error: deleteReservationsError } = await supabaseAdmin
           .from('reservations')
           .delete()
@@ -909,13 +912,11 @@ export async function deleteCommerce(targetCommerceId: string) {
       
       if (deleteReservationsError) {
           console.error('Error deleting reservations:', deleteReservationsError);
-          // Continue anyway to try to delete the rest
+          throw new Error(`Error al eliminar reservas: ${deleteReservationsError.message}`);
       }
 
-      // 2b. Delete Ticket Types (via Events)
-      // Since ticket_types usually don't have commerce_id directly, we find events first or rely on cascade.
-      // But let's try to be thorough. 
-      // First get event IDs to delete their tickets.
+      // 2b. Delete Ticket Types (FK to events)
+      // First get event IDs
       const { data: events } = await supabaseAdmin
           .from('events')
           .select('id')
@@ -928,16 +929,22 @@ export async function deleteCommerce(targetCommerceId: string) {
               .delete()
               .in('event_id', eventIds);
             
-          if (deleteTicketsError) console.error('Error deleting tickets:', deleteTicketsError);
+          if (deleteTicketsError) {
+             console.error('Error deleting tickets:', deleteTicketsError);
+             throw new Error(`Error al eliminar tipos de entradas: ${deleteTicketsError.message}`);
+          }
       }
 
-      // 2c. Delete Events
+      // 2c. Delete Events (FK to comercios)
       const { error: deleteEventsError } = await supabaseAdmin
           .from('events')
           .delete()
           .eq('comercio_id', targetCommerceId);
 
-      if (deleteEventsError) console.error('Error deleting events:', deleteEventsError);
+      if (deleteEventsError) {
+          console.error('Error deleting events:', deleteEventsError);
+          throw new Error(`Error al eliminar eventos: ${deleteEventsError.message}`);
+      }
 
       // 3. Delete the Commerce Record
       const { error: deleteCommerceError } = await supabaseAdmin
@@ -953,15 +960,18 @@ export async function deleteCommerce(targetCommerceId: string) {
           if (deleteUserError) {
               console.error('Error deleting auth user:', deleteUserError);
               // We don't throw here because the commerce is already deleted, which was the main goal.
+              // But we should probably log it well.
           }
       }
 
-      // 4. Audit Log
+      // 5. Audit Log (using MASTER commerce context implicitly or just logging generic)
+      // Since the commerce is gone, we can't link it easily, but we record the ID.
       await supabaseAdmin.from('audit_logs').insert({
           table_name: 'comercios',
           record_id: targetCommerceId,
           action: 'DELETE',
-          old_data: commerce
+          old_data: commerce,
+          performed_by: 'Super Admin'
       });
 
       revalidatePath('/admin');

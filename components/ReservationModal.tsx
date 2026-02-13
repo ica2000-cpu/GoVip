@@ -6,6 +6,7 @@ import { X, Check, Copy, AlertTriangle } from 'lucide-react';
 import { createReservation } from '@/app/actions/public';
 import PaymentInstructions from './PaymentInstructions';
 import TicketPDF from './TicketPDF';
+import { formatDate, formatMoney } from '@/lib/format';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -36,10 +37,6 @@ export default function ReservationModal({ isOpen, onClose, event, relatedEvents
   const [successReservationCode, setSuccessReservationCode] = useState<string | null>(null);
   const [successPaymentReference, setSuccessPaymentReference] = useState<string | null>(null);
   
-  // Removed internal state for paymentSettings since it is now a prop
-
-  // Removed useEffect for fetching paymentSettings
-
   // Update selectedEventId when modal opens with a new event
   if (event && selectedEventId === 0) {
       setSelectedEventId(event.id);
@@ -104,11 +101,11 @@ export default function ReservationModal({ isOpen, onClose, event, relatedEvents
   const selectedTicketType = currentEvent.ticket_types.find(t => t.id === Number(selectedTicketTypeId));
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 transition-all">
-      <div className="bg-[#0a0a0a] rounded-xl shadow-lg shadow-black max-w-[500px] w-full p-8 relative border border-gray-800">
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 transition-all overflow-y-auto">
+      <div className="bg-[#0a0a0a] rounded-xl shadow-lg shadow-black max-w-[500px] w-full p-6 sm:p-8 relative border border-gray-800 my-auto">
         <button 
           onClick={handleClose}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 text-gray-400 hover:text-white transition-colors p-2 z-10"
         >
           <X size={24} />
         </button>
@@ -183,7 +180,7 @@ export default function ReservationModal({ isOpen, onClose, event, relatedEvents
                     >
                         {relatedEvents.map(evt => (
                             <option key={evt.id} value={evt.id} className="bg-black text-white">
-                                {new Date(evt.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                {formatDate(evt.date, true)}
                             </option>
                         ))}
                     </select>
@@ -192,7 +189,7 @@ export default function ReservationModal({ isOpen, onClose, event, relatedEvents
               {!relatedEvents && (
                   <p className="text-sm text-gray-300 mb-2 border-b border-gray-800 pb-2">
                       <strong className="text-gray-500 uppercase text-xs tracking-wider mr-2 font-bold">Fecha:</strong> 
-                      {new Date(currentEvent.date).toLocaleDateString()}
+                      {formatDate(currentEvent.date, true)}
                   </p>
               )}
 
@@ -207,7 +204,7 @@ export default function ReservationModal({ isOpen, onClose, event, relatedEvents
                   <option value="" className="bg-black text-gray-500">Selecciona una opción</option>
                   {currentEvent.ticket_types.map((ticket) => (
                     <option key={ticket.id} value={ticket.id} disabled={ticket.stock === 0} className="bg-black text-white">
-                      {ticket.name} - {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(ticket.price)} ({ticket.stock} disponibles)
+                      {ticket.name} - {formatMoney(ticket.price)} ({ticket.stock} disponibles)
                     </option>
                   ))}
                 </select>

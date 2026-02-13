@@ -2,13 +2,31 @@
 
 import { useState } from 'react';
 import { Event } from '@/types';
-import { MapPin, Calendar } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import Image from 'next/image';
 
 interface EventCardProps {
   event: Event;
   relatedEvents?: Event[]; // Array of all events in the group (different dates)
   onReserveClick: (event: Event, relatedEvents?: Event[]) => void;
+}
+
+// Hydration-safe helpers
+function formatMoney(amount: number) {
+  return '$ ' + amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return 'Próximamente';
+  // Parse YYYY-MM-DD manually to avoid timezone issues
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  
+  const day = parts[2];
+  const monthIndex = parseInt(parts[1]) - 1;
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  
+  return `${day} ${months[monthIndex] || ''}`;
 }
 
 export default function EventCard({ event, relatedEvents, onReserveClick }: EventCardProps) {
@@ -25,7 +43,7 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           onError={() => setImgSrc('https://images.unsplash.com/photo-1459749411177-287ce3288b71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')} // Fallback image
         />
-        {relatedEvents && (
+        {relatedEvents && relatedEvents.length > 0 && (
             <div className="absolute top-2 right-2 bg-black text-white text-xs font-bold px-3 py-1.5 rounded border border-gray-700 z-10">
                 {relatedEvents.length} Fechas
             </div>
@@ -38,7 +56,7 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
         <h2 className="text-2xl font-bold mb-2 text-white tracking-tight">{event.title}</h2>
         <p className="text-gray-400 mb-6 line-clamp-2 text-sm font-medium">{event.description}</p>
         
-        {relatedEvents && (
+        {relatedEvents && relatedEvents.length > 0 && (
             <div className="mb-4">
                 <div className="flex flex-wrap gap-2">
                     {relatedEvents.map(evt => (
@@ -46,7 +64,7 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
                             key={evt.id}
                             className="bg-gray-800 text-gray-300 text-xs font-bold px-2.5 py-1 rounded border border-gray-700"
                         >
-                            {new Date(evt.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                            {formatDate(evt.date)}
                         </span>
                     ))}
                 </div>
@@ -64,7 +82,7 @@ export default function EventCard({ event, relatedEvents, onReserveClick }: Even
               <li key={ticket.id} className="flex justify-between text-sm text-gray-400">
                 <span className="font-medium">{ticket.name}</span>
                 <span className="font-bold text-white">
-                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(ticket.price)}
+                  {formatMoney(ticket.price)}
                 </span>
               </li>
             ))}
