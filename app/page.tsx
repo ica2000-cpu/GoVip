@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
-  console.log('Rendering Home Page');
   // Fetch all commerces, prioritized by es_destacado
   const { data: commerces, error } = await supabase
     .from('comercios')

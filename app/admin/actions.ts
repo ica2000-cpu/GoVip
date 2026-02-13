@@ -62,7 +62,7 @@ export async function checkAuth(formData: FormData) {
 
     // 2. Fallback: Environment Variable (Emergency Access)
     // Only if password matches env var (ignoring email or if email matches a specific admin email)
-    if (password === process.env.ADMIN_PASSWORD) {
+    if (process.env.ADMIN_PASSWORD && password === process.env.ADMIN_PASSWORD) {
         const cookieStore = await cookies();
         cookieStore.set('admin_session', MASTER_COMMERCE_ID, { httpOnly: true, secure: true });
         return { success: true };
