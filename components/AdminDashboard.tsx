@@ -258,7 +258,7 @@ export default function AdminDashboard({
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <nav className="bg-[#111] border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-opacity-90">
+      <nav className="bg-[#111] border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -353,55 +353,55 @@ export default function AdminDashboard({
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
-            <div className="md:hidden bg-[#0a0a0a] border-b border-gray-800">
+            <div className="md:hidden bg-[#0a0a0a] border-b border-gray-800 absolute top-16 left-0 right-0 z-50 shadow-2xl">
                 <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                     <button 
                         onClick={() => { setActiveTab('events'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
                     >
                         Eventos
                     </button>
                     {isSuperAdmin && (
                         <button 
                             onClick={() => { setActiveTab('master_events'); setIsMobileMenuOpen(false); }}
-                            className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'master_events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                            className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'master_events' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
                         >
-                            <span className="flex items-center"><Crown size={18} className="mr-2 text-amber-500" /> Eventos Maestros</span>
+                            <span className="flex items-center"><Crown size={20} className="mr-3 text-amber-500" /> Eventos Maestros</span>
                         </button>
                     )}
                     <button 
                         onClick={() => { setActiveTab('reservations'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'reservations' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'reservations' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
                     >
                         Reservas
                     </button>
                     <button 
                         onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
-                        className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'settings' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                        className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'settings' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
                     >
-                        <span className="flex items-center"><Settings size={18} className="mr-2" /> Mi Comercio</span>
+                        <span className="flex items-center"><Settings size={20} className="mr-3" /> Mi Comercio</span>
                     </button>
                     {isSuperAdmin && (
                         <button 
                             onClick={() => { setActiveTab('clients'); setIsMobileMenuOpen(false); }}
-                            className={`block w-full text-left px-3 py-3 rounded-md text-base font-medium ${activeTab === 'clients' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
+                            className={`block w-full text-left px-3 py-4 rounded-md text-lg font-medium ${activeTab === 'clients' ? 'bg-blue-900/20 text-blue-400' : 'text-gray-300 hover:bg-white/5'}`}
                         >
-                             <span className="flex items-center"><Globe size={18} className="mr-2" /> Gestión de Clientes</span>
+                             <span className="flex items-center"><Globe size={20} className="mr-3" /> Gestión de Clientes</span>
                         </button>
                     )}
                     
                     <div className="border-t border-gray-800 my-2 pt-2 flex gap-2">
                         <button 
                             onClick={handleSync}
-                            className="flex-1 flex items-center justify-center px-3 py-3 rounded-md text-base font-medium text-gray-300 hover:bg-white/5 bg-gray-900/50"
+                            className="flex-1 flex items-center justify-center px-3 py-4 rounded-md text-base font-medium text-gray-300 hover:bg-white/5 bg-gray-900/50"
                         >
-                            <RefreshCw size={18} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar
+                            <RefreshCw size={20} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar
                         </button>
                         <button 
                             onClick={async () => { await logout(); window.location.href = '/admin'; }}
-                            className="flex-1 flex items-center justify-center px-3 py-3 rounded-md text-base font-medium text-red-400 hover:bg-red-900/10 bg-red-900/5"
+                            className="flex-1 flex items-center justify-center px-3 py-4 rounded-md text-base font-medium text-red-400 hover:bg-red-900/10 bg-red-900/5"
                         >
-                            <LogOut size={18} className="mr-2" /> Salir
+                            <LogOut size={20} className="mr-2" /> Salir
                         </button>
                     </div>
                 </div>

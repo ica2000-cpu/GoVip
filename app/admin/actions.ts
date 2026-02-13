@@ -840,14 +840,21 @@ export async function createNewCommerce(formData: FormData) {
   }
 
   try {
+      // 0. Check if user already exists to provide better error
+      // Note: createUser would fail anyway, but this is cleaner
+      // We skip this optimization to save an API call and rely on createUser error
+
       // 1. Create Auth User
       const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
           email: email,
           password: password,
-          email_confirm: true
+          email_confirm: true // Auto-confirm email so they can login immediately
       });
 
-      if (userError) throw userError;
+      if (userError) {
+          console.error('Error creating Auth User:', userError);
+          return { success: false, error: `Error creando usuario: ${userError.message}` };
+      }
 
       // 2. Create Commerce Record linked to User
       const { data: commerce, error: commerceError } = await supabaseAdmin
@@ -864,10 +871,10 @@ export async function createNewCommerce(formData: FormData) {
           .single();
 
       if (commerceError) {
-          // Rollback user creation if commerce fails? 
-          // For now, let's just error out. 
+          console.error('Error creating Commerce record:', commerceError);
+          // Rollback user creation to prevent orphans
           await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
-          throw commerceError;
+          return { success: false, error: `Error creando comercio: ${commerceError.message}` };
       }
 
       revalidatePath('/admin');

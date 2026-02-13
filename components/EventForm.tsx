@@ -351,8 +351,8 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={handleAddTicketType} className="mt-4 flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 px-3 py-2 rounded-md hover:bg-blue-100 w-full sm:w-auto justify-center sm:justify-start">
-                  <Plus size={16} className="mr-1" /> Añadir otra zona
+                <button type="button" onClick={handleAddTicketType} className="mt-4 flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 px-3 py-3 rounded-md hover:bg-blue-100 w-full sm:w-auto justify-center sm:justify-start">
+                  <Plus size={18} className="mr-1" /> Añadir otra zona
                 </button>
               </div>
 
@@ -362,14 +362,14 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                 <button 
                   type="submit" 
                   disabled={loading} 
-                  className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {loading ? 'Guardando...' : 'Guardar Evento'}
                 </button>
                 <button 
                   type="button" 
                   onClick={onClose} 
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition-all"
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-3 text-base font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition-all"
                 >
                   Cancelar
                 </button>
