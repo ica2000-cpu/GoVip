@@ -85,10 +85,6 @@ export default async function Home() {
                         <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">
                             {commerce.nombre}
                         </h3>
-                        
-                        <p className="text-sm text-gray-500 mb-6 font-mono">
-                            govip.com/{commerce.slug}
-                        </p>
 
                         <div className="w-full mt-auto">
                             <span className="block w-full py-3 bg-gray-900 text-gray-300 rounded-lg text-sm font-medium group-hover:bg-blue-600 group-hover:text-white transition-all">
