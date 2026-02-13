@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Search, Star, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { Commerce, Category } from '@/types';
+import CategoryIcon from '@/components/CategoryIcon';
 
 export default function HomeClient({ 
   initialCommerces, 
@@ -79,7 +80,7 @@ export default function HomeClient({
                                 : 'bg-[#111] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white'
                         }`}
                     >
-                        <span>{cat.icono}</span>
+                        <CategoryIcon iconName={cat.icono} className="w-4 h-4" />
                         {cat.nombre}
                     </button>
                 ))}
@@ -120,7 +121,7 @@ export default function HomeClient({
                         {/* Category Badge (New) */}
                         {commerce.categorias && (
                             <div className="absolute top-4 left-4 bg-gray-800/80 backdrop-blur-sm text-gray-300 px-3 py-1 rounded-full text-xs font-medium border border-gray-700 flex items-center gap-1 z-10">
-                                <span>{commerce.categorias.icono}</span>
+                                <CategoryIcon iconName={commerce.categorias.icono} className="w-3 h-3" />
                                 <span>{commerce.categorias.nombre}</span>
                             </div>
                         )}

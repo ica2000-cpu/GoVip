@@ -1562,6 +1562,7 @@ export async function createCategory(formData: FormData) {
     if (error) return { success: false, error: error.message };
     
     revalidatePath('/admin');
+    revalidatePath('/'); // Refresh public pages too
     return { success: true };
 }
 
@@ -1581,6 +1582,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     if (error) return { success: false, error: error.message };
     
     revalidatePath('/admin');
+    revalidatePath('/'); // Refresh public pages too
     return { success: true };
 }
 
@@ -1596,5 +1598,6 @@ export async function deleteCategory(categoryId: string) {
     if (error) return { success: false, error: error.message };
     
     revalidatePath('/admin');
+    revalidatePath('/'); // Refresh public pages too
     return { success: true };
 }

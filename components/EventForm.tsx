@@ -8,11 +8,12 @@ import { createEvent, updateEvent } from '@/app/admin/actions';
 interface EventFormProps {
   event?: Event | null;
   relatedEvents?: Event[]; // Events with same title
+  categories?: any[]; // Dynamic categories
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function EventForm({ event, relatedEvents, onClose, onSuccess }: EventFormProps) {
+export default function EventForm({ event, relatedEvents, categories = [], onClose, onSuccess }: EventFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -255,12 +256,16 @@ export default function EventForm({ event, relatedEvents, onClose, onSuccess }: 
                 <div className="col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
                   <select value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg p-3 text-base text-gray-900 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm bg-white">
-                    <option value="Recital">Recital</option>
-                    <option value="Deporte">Deporte</option>
-                    <option value="Teatro">Teatro</option>
-                    <option value="Restaurante">Restaurante</option>
-                    <option value="Rent a Car">Rent a Car</option>
-                    <option value="Excursiones">Excursiones</option>
+                    {categories && categories.length > 0 ? (
+                        <>
+                            <option value="">Seleccionar Categoría...</option>
+                            {categories.filter(c => c.activo).map(cat => (
+                                <option key={cat.id} value={cat.nombre}>{cat.icono} {cat.nombre}</option>
+                            ))}
+                        </>
+                    ) : (
+                        <option value="" disabled>Cargando categorías...</option>
+                    )}
                   </select>
                 </div>
                 <div className="col-span-1">

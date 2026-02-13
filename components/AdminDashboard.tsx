@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X, Star, Eye, EyeOff, ExternalLink, Filter, AlertTriangle, ChevronRight, Download, Activity, LogIn, CheckSquare, Square, Tag, Layers, Power, Ban } from 'lucide-react';
+import { Search, Package, Calendar, Music, Plus, Edit, Trash2, Copy, CreditCard, Save, XCircle, RotateCcw, Settings, Home, Users, UserPlus, Check, LogOut, Share2, Globe, Crown, RefreshCw, Menu, X, Star, Eye, EyeOff, ExternalLink, Filter, AlertTriangle, ChevronRight, Download, Activity, LogIn, CheckSquare, Square, Tag, Layers, Power, Ban, Utensils, Car, Ship, Camera, Ticket, ShoppingBag, Dumbbell, Coffee, Wine, Layout, Anchor } from 'lucide-react';
+import CategoryIcon from '@/components/CategoryIcon';
 import { Event } from '@/types';
 import EventForm from './EventForm';
 import { deleteEvent, deleteReservation, deleteAllReservations, resetEventStock, resetAllEventStock, updateCommerceSettings, createNewCommerce, updateAdminPassword, deleteCommerce, logout, syncWebCache, distributeEvent, toggleCommerceFeatured, toggleCommerceStatus, toggleEventStatus, bulkDeleteEvents, bulkToggleEventStatus, impersonateCommerce, getAuditLogs, getExportData, createCategory, updateCategory, deleteCategory, getCategories } from '@/app/admin/actions';
@@ -47,6 +48,7 @@ export default function AdminDashboard({
   const [logs, setLogs] = useState<any[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [categories, setCategories] = useState<any[]>(initialCategories || []);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const [showEventForm, setShowEventForm] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false); // New state for client form
@@ -114,15 +116,25 @@ export default function AdminDashboard({
   }, [activeTab]);
 
   useEffect(() => {
-    if ((!categories || categories.length === 0) && isSuperAdmin) {
+    if (!categories || categories.length === 0) {
         // Fetch categories if not passed initially
-        getCategories().then(res => {
-            if (res.success && res.categories) {
-                setCategories(res.categories);
-            }
-        });
+        refreshCategories();
     }
-  }, [isSuperAdmin]);
+  }, []);
+
+  const refreshCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const res = await getCategories();
+        if (res.success && res.categories) {
+            setCategories(res.categories);
+        }
+      } catch (e) {
+        console.error('Error fetching categories:', e);
+      } finally {
+        setCategoriesLoading(false);
+      }
+  };
 
   const loadLogs = async () => {
     setIsLoadingLogs(true);
@@ -462,6 +474,7 @@ export default function AdminDashboard({
         setShowCategoryForm(false);
         setEditingCategory(null);
         router.refresh();
+        refreshCategories();
     } else {
         alert('Error: ' + result.error);
     }
@@ -473,6 +486,7 @@ export default function AdminDashboard({
       if (result.success) {
           showSuccess('Categoría eliminada');
           router.refresh();
+          refreshCategories();
       } else {
           alert('Error: ' + result.error);
       }
@@ -573,10 +587,18 @@ export default function AdminDashboard({
           </button>
       </div>
 
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+            onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar Navigation */}
       <aside className={`
-          fixed md:sticky top-0 left-0 h-screen w-64 bg-[#050505] border-r border-gray-800/50 flex flex-col z-40 transition-transform duration-300 ease-in-out
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          fixed md:sticky top-0 left-0 h-screen w-[80%] max-w-xs bg-[#050505]/95 backdrop-blur-xl border-r border-gray-800/50 flex flex-col z-50 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none md:translate-x-0
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
           <div className="p-6 border-b border-gray-800/50 hidden md:flex items-center gap-3">
               {commerceLogo ? (
@@ -603,8 +625,8 @@ export default function AdminDashboard({
                           : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
               >
-                  <Music size={18} className={activeTab === 'events' ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                  Cartelera
+                  <Music size={18} className={`shrink-0 ${activeTab === 'events' ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                  <span className="truncate">Cartelera</span>
               </button>
 
               <button 
@@ -615,8 +637,8 @@ export default function AdminDashboard({
                           : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
               >
-                  <Calendar size={18} className={activeTab === 'reservations' ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                  Reservas
+                  <Calendar size={18} className={`shrink-0 ${activeTab === 'reservations' ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                  <span className="truncate">Reservas</span>
               </button>
 
               {isSuperAdmin && (
@@ -630,8 +652,8 @@ export default function AdminDashboard({
                                   : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}
                       >
-                          <Crown size={18} className={activeTab === 'master_events' ? 'text-amber-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                          Maestros
+                          <Crown size={18} className={`shrink-0 ${activeTab === 'master_events' ? 'text-amber-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                          <span className="truncate">Maestros</span>
                       </button>
                       <button 
                           onClick={() => { setActiveTab('clients'); setIsMobileMenuOpen(false); }}
@@ -641,8 +663,8 @@ export default function AdminDashboard({
                                   : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}
                       >
-                          <Globe size={18} className={activeTab === 'clients' ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                          Clientes
+                          <Globe size={18} className={`shrink-0 ${activeTab === 'clients' ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                          <span className="truncate">Clientes</span>
                       </button>
                       <button 
                           onClick={() => { setActiveTab('categories'); setIsMobileMenuOpen(false); }}
@@ -652,8 +674,8 @@ export default function AdminDashboard({
                                   : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}
                       >
-                          <Layers size={18} className={activeTab === 'categories' ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                          Categorías
+                          <Layers size={18} className={`shrink-0 ${activeTab === 'categories' ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                          <span className="truncate">Categorías</span>
                       </button>
                       <button 
                           onClick={() => { setActiveTab('logs'); setIsMobileMenuOpen(false); }}
@@ -663,8 +685,8 @@ export default function AdminDashboard({
                                   : 'text-gray-400 hover:text-white hover:bg-white/5'
                           }`}
                       >
-                          <Activity size={18} className={activeTab === 'logs' ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                          Auditoría
+                          <Activity size={18} className={`shrink-0 ${activeTab === 'logs' ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                          <span className="truncate">Auditoría</span>
                       </button>
                   </>
               )}
@@ -679,8 +701,8 @@ export default function AdminDashboard({
                           : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
               >
-                  <Settings size={18} className={activeTab === 'settings' ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'} />
-                  Mi Comercio
+                  <Settings size={18} className={`shrink-0 ${activeTab === 'settings' ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                  <span className="truncate">Mi Comercio</span>
               </button>
           </nav>
 
@@ -769,16 +791,29 @@ export default function AdminDashboard({
 
                  <div className="relative group">
                     <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md p-1.5 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
-                        <Filter size={16} className="text-gray-400 ml-2" />
+                        <div className="text-gray-400 ml-2 pointer-events-none">
+                            <CategoryIcon 
+                                iconName={filterCategory === 'all' ? 'filter' : categories.find(c => c.nombre === filterCategory)?.icono || 'tag'} 
+                                className="w-4 h-4" 
+                            />
+                        </div>
                         <select 
                             value={filterCategory}
                             onChange={(e) => setFilterCategory(e.target.value)}
                             className="bg-transparent border-none text-sm text-gray-200 focus:ring-0 cursor-pointer py-1 pr-8 font-medium appearance-none min-w-[140px]"
+                            disabled={categoriesLoading}
                         >
                             <option value="all" className="bg-gray-900">Todas las Categorías</option>
-                            {uniqueCategories.map(cat => (
-                                <option key={cat} value={cat} className="bg-gray-900">{cat}</option>
-                            ))}
+                            {categoriesLoading ? (
+                                <option value="" disabled>Cargando...</option>
+                            ) : (
+                                categories && categories.length > 0 && categories.filter(c => c.activo).map(cat => (
+                                    <option key={cat.id} value={cat.nombre} className="bg-gray-900">
+                                        {/* We show text here because options don't support components, but we try to show emoji if it's short */}
+                                        {cat.icono && cat.icono.length < 4 ? cat.icono + ' ' : ''}{cat.nombre}
+                                    </option>
+                                ))
+                            )}
                         </select>
                         <ChevronRight size={14} className="text-gray-500 absolute right-3 pointer-events-none rotate-90" />
                     </div>
@@ -1663,7 +1698,7 @@ export default function AdminDashboard({
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                                         {client.categorias ? (
                                             <span className="flex items-center gap-2">
-                                                <span>{client.categorias.icono}</span>
+                                                <CategoryIcon iconName={client.categorias.icono} className="w-4 h-4 text-gray-300" />
                                                 <span>{client.categorias.nombre}</span>
                                             </span>
                                         ) : '-'}
@@ -1736,14 +1771,14 @@ export default function AdminDashboard({
                                  )}
                                  <div className="flex-1 min-w-0">
                                      <h3 className="text-white font-bold text-lg truncate">{client.nombre}</h3>
-                                     <p className="text-blue-400 text-sm">/{client.slug}</p>
-                                     {client.categorias && (
-                                        <p className="text-gray-500 text-xs flex items-center gap-1 mt-0.5">
-                                            <span>{client.categorias.icono}</span>
-                                            <span>{client.categorias.nombre}</span>
-                                        </p>
-                                     )}
-                                 </div>
+                                    <p className="text-blue-400 text-sm">/{client.slug}</p>
+                                    {client.categorias && (
+                                       <p className="text-gray-500 text-xs flex items-center gap-1 mt-0.5">
+                                           <CategoryIcon iconName={client.categorias.icono} className="w-3 h-3" />
+                                           <span>{client.categorias.nombre}</span>
+                                       </p>
+                                    )}
+                                </div>
                                  <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${client.activo !== false ? 'bg-green-900/30 text-green-300 border-green-800/50' : 'bg-red-900/30 text-red-300 border-red-800/50'}`}>
                                      {client.activo !== false ? 'Activo' : 'Susp.'}
                                  </span>
@@ -1885,7 +1920,12 @@ export default function AdminDashboard({
                                         <div className="text-sm font-medium text-white">{category.nombre}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                        {category.icono || '-'}
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-white/5 rounded border border-white/10">
+                                                <CategoryIcon iconName={category.icono} className="w-4 h-4 text-gray-300" />
+                                            </div>
+                                            <span className="font-mono text-xs">{category.icono || '-'}</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -1927,6 +1967,7 @@ export default function AdminDashboard({
           <EventForm 
             event={editingEvent} 
             relatedEvents={relatedEvents}
+            categories={categories}
             onClose={() => setShowEventForm(false)} 
             onSuccess={() => { 
               setShowEventForm(false); 
